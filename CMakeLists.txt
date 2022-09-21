@@ -2,12 +2,14 @@ project(LearnOpenGL)
 
 cmake_minimum_required(VERSION 3.20.0)
 
-include_directories(
-    ${GLFW_INCLUDE_DIRS}
-)
+find_package(OpenGL REQUIRED)
+# find_package(Freetype REQUIRED)
+find_package(PkgConfig QUIET)
 
-link_directories(
-    ${GLFW_LIBRARY_DIRS}
-)
+add_subdirectory(glfw)
+set_property(TARGET glfw APPEND_STRING PROPERTY COMPILE_FLAGS -w)
+
+add_subdirectory(glad)
+set_property(TARGET glad APPEND_STRING PROPERTY COMPILE_FLAGS -w)
 
 add_subdirectory(src)
