@@ -12,6 +12,17 @@
 
 #define LF "\n"
 
+// 关于 shader
+
+// 1.除基础数据类型还有 vector、matrix。(int, float, double, uint, bool)
+// vecn 的 n 可以是 2-4，默认 float 类型，bvecn, ivecn, uvecn, dvecn
+// 取四个数可以用 x y z w 或 r g b a 或 s t p q
+// 可以快速构造另一个 vector 通过：someVec.xyzx（swizzling），因此最多 4 个元素 .xxxx
+// 可以把 vec 作为构造函数的参数 vec4(someVec.xx, 1, 1)
+// 2.shader 之间如果要“连接”起来，输出和输入的变量同类型、同名即可
+// 3.全局变量用 uniform 修饰，先取位置再写入值，demo 和更多细节在下一节
+
+// 可以不写 layout，用 glGetAttribLocation 得到 index 然后 enable；
 static const char *vertext_shader =
 "   #version 330 core"LF
 "   layout (location = 0) in vec3 pos;"LF
@@ -38,7 +49,6 @@ static float vertices[] = {
 void log(const char *fmt, ...);
 
 static GLuint use_simple_shader();
-static GLuint use_simple_shader_2();
 
 void Renderer::renderVBO() {
     
@@ -62,7 +72,9 @@ void Renderer::renderVBO() {
     
     // 连接 vertex data(vbo) 与 shader vertex attributes
     // 给 OpenGL 解释当前状态机里的 vbo 是如何组织的、格式是什么
-    // 背景：vertex data 是 vertex 的集合，vertex 是 attributes 的集合，每个 attribute 分配一个序号。每个 attribute 由 1-4 个数据组成。
+    // 背景：vertex data 是 vertex 的集合，vertex 是 attributes 的集合
+    // 每个 attribute 分配一个序号。每个 attribute 由 1-4 个数据组成。
+    // 硬件必须至少支持 16 个 attribute
     
     // void (GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid *pointer)
     // 开始解释【一个 attribute】，参数依次是其：
@@ -243,6 +255,8 @@ void log(const char *fmt, ...) {
     
 }
 
+// MARK: - 下面是练习
+
 static float vertices_3_1[] = {
     -0.5f, -0.5f, 0.0f,
     0.5f, -0.5f, 0.0f,
@@ -255,6 +269,7 @@ static float vertices_3_2[] = {
     0.75f, 0.9f, 0.0f
 };
 
+static GLuint use_simple_shader_2();
 
 void Renderer::renderVAO2() {
     // vao 具体会保存：attribute pointer 及其关联的 vbo，enable/disable
