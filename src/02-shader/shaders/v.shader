@@ -9,5 +9,5 @@ out vec3 outColor;
 
 void main() {
     gl_Position = vec4(pos.x + customX, -pos.y, pos.z, 1);
-    outColor = gl_Position.xyz + dataColor * 0.1;
+    outColor = gl_Position.xyz + dataColor * 0.4;
 }

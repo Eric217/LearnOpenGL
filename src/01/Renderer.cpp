@@ -14,7 +14,7 @@
 
 // 关于 shader
 
-// 1.除基础数据类型还有 vector、matrix。(int, float, double, uint, bool)
+// 1.除基础数据类型 (int, float, double, uint, bool) 还有 vector、matrix 等
 // vecn 的 n 可以是 2-4，默认 float 类型，bvecn, ivecn, uvecn, dvecn
 // 取四个数可以用 x y z w 或 r g b a 或 s t p q
 // 可以快速构造另一个 vector 通过：someVec.xyzx（swizzling），因此最多 4 个元素 .xxxx

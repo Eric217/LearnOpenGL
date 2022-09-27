@@ -6,10 +6,14 @@ find_package(OpenGL REQUIRED)
 # find_package(Freetype REQUIRED)
 find_package(PkgConfig QUIET)
 
-add_subdirectory(glfw)
-set_property(TARGET glfw APPEND_STRING PROPERTY COMPILE_FLAGS -w)
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
+add_subdirectory(glfw)
 add_subdirectory(glad)
-set_property(TARGET glad APPEND_STRING PROPERTY COMPILE_FLAGS -w)
+add_subdirectory(lib)
+
+set_property(TARGET glfw glad stb_image APPEND_STRING PROPERTY 
+    COMPILE_FLAGS -w
+)
 
 add_subdirectory(src)
