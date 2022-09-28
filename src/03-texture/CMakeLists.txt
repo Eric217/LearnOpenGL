@@ -17,7 +17,7 @@ source_group(src FILES ${_src})
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${_shaders} ${_texs})
 
 target_link_libraries(03
-    glfw glad stb_image ${GLFW_LIBRARIES}
+    glfw glad stb_image glm ${GLFW_LIBRARIES}
 )
 
 target_compile_definitions(03 PRIVATE

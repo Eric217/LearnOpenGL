@@ -13,6 +13,8 @@
 #include <string.h>
 #include <math.h>
 #include <algorithm>
+#include <glm/glm.hpp>
+#include <glm/ext.hpp>
 
 static GLfloat vertices[] = {
     // 左上角顺时针 pos | texture coordinate
@@ -27,10 +29,19 @@ static GLuint indices[] = {
     2, 0, 3
 };
 
+static int count = 0;
+
 void Renderer::render() {
     glClearColor(0.2f, 0.3f, 0.3f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
-    
+    glm::mat4 transform(1.0f);
+    count += 1;
+    float radian = glm::radians((float)count);
+    transform = glm::translate(transform, glm::vec3(0.5 * sin(radian), 0.5 * sin(radian), 0));
+    transform = glm::rotate(transform, radian, glm::vec3(0, 0, 1));
+    transform = glm::scale(transform, glm::vec3(0.5, 0.5, 1));
+    shader->setMat4("transform", transform);
+
     glBindVertexArray(vao);
     glDrawElements (GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 }
@@ -65,7 +76,7 @@ Renderer::Renderer() {
         shader->setInt("image" + std::to_string(i), i);
         textures[i]->use(i);
     }
-    shader->setFloat("mixLevel", 0);
+    shader->setFloat("mixLevel", 0.2);
 }
 
 Renderer::~Renderer() {

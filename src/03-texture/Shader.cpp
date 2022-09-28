@@ -11,6 +11,7 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <glm/gtc/type_ptr.hpp>
 
 void Shader::use() {
     glUseProgram(ID);
@@ -35,6 +36,11 @@ void Shader::setInt(const std::string &name, int value) const {
 void Shader::setFloat(const std::string &name, float value) const {
     auto loc = glGetUniformLocation(ID, name.c_str());
     glUniform1f(loc, value);
+}
+
+void Shader::setMat4(const std::string &name, const glm::mat4 &matrix) const {
+    auto loc = glGetUniformLocation(ID, name.c_str());
+    glUniformMatrix4fv(loc, 1, false, glm::value_ptr(matrix));
 }
 
 Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath) {

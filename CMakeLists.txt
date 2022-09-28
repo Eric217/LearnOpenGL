@@ -11,6 +11,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 add_subdirectory(glfw)
 add_subdirectory(glad)
 add_subdirectory(lib)
+add_subdirectory(submodules)
 
 set_property(TARGET glfw glad stb_image APPEND_STRING PROPERTY 
     COMPILE_FLAGS -w
