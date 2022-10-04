@@ -7,6 +7,8 @@ find_package(OpenGL REQUIRED)
 find_package(PkgConfig QUIET)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+set(CMAKE_CXX_STANDARD 17)
+
 
 add_subdirectory(glfw)
 add_subdirectory(glad)

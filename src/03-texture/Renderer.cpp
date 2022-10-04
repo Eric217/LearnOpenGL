@@ -32,8 +32,6 @@ static GLuint indices[] = {
 static int count = 0;
 
 void Renderer::render() {
-    glClearColor(0.2f, 0.3f, 0.3f, 1.f);
-    glClear(GL_COLOR_BUFFER_BIT);
     glm::mat4 transform(1.0f);
     count += 1;
     float radian = glm::radians((float)count);
@@ -43,6 +41,13 @@ void Renderer::render() {
     shader->setMat4("transform", transform);
 
     glBindVertexArray(vao);
+    glDrawElements (GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    
+    transform = glm::mat4(1.0f);
+    transform = glm::translate(transform, glm::vec3(-0.5 * sin(radian), -0.5 * cos(radian), 0));
+    transform = glm::rotate(transform, radian, glm::vec3(0, 0, 1));
+    transform = glm::scale(transform, glm::vec3(0.5 * (1 + cos(radian)), 0.5 * (1 + cos(radian)), 1));
+    shader->setMat4("transform", transform);
     glDrawElements (GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 }
 
