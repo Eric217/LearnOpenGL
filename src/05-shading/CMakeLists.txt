@@ -3,12 +3,14 @@ set(_target_name 05-shading)
 set(_src 
     main05.cpp Renderer.cpp Renderer.h Shader.h Shader.cpp
     Texture.h Texture.cpp Camera.h Camera.cpp
+    Light.h Light.cpp
 )
 set(_shaders 
     shaders/v.shader shaders/f.shader shaders/f2.shader
 )
 set(_texs 
-    textures/container.jpg
+    textures/container2.png textures/container2_specular.png
+    textures/matrix.jpg
 )
 
 set(_all ${_src} ${_shaders} ${_texs})

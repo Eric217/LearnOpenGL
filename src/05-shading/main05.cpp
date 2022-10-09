@@ -59,6 +59,7 @@ int main() {
     camera->front = vec3(0.f, 0.f, -1.f);
     camera->upVec = vec3(0.f, 1.f, 0.f);
     camera->fov = 45;
+    renderer->camera = camera;
     
     // 灯的位置
     auto mat2 = translate(matM, vec3(1.5f, 0.99f, 1.7f));

@@ -10,6 +10,8 @@
 
 #include "Shader.h"
 #include "Texture.h"
+#include "Camera.h"
+
 #include <glad/glad.h>
 #include <vector>
 #include <glm/glm.hpp>
@@ -25,6 +27,8 @@ public:
     glm::mat4 model2M;
     glm::mat4 viewM;
     glm::mat4 projectionM;
+    
+    Camera *camera;
 public:
     Renderer();
     virtual ~Renderer();

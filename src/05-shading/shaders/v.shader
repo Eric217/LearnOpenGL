@@ -7,18 +7,24 @@ layout(location = 2) in vec2 texCoor;
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
-
 uniform mat4 normalTransform;
 
-out vec2 outTexCoor;
-out vec3 normal_f;
-out vec3 vecPos;
+
+struct Payload {
+    vec2 tex_coor;
+    vec3 pos; // view space coor
+    vec3 normal; // view space coor
+};
+
+out Payload frag;
 
 void main() {
-    // GL 希望输出的是 clip-space coordinate，然后内部处理裁剪、除以 w、z-test
     vec4 vecPos4 = view * model * vec4(pos, 1);
-    vecPos = vecPos4.xyz;
+    
+    frag.pos = vecPos4.xyz;
+    frag.tex_coor = texCoor;
+    frag.normal = normalize((normalTransform * vec4(normal, 0)).xyz);
+
+    // GL 希望输出的是 clip-space coordinate，然后内部处理裁剪、除以 w、z-test
     gl_Position = projection * vecPos4;
-    outTexCoor = texCoor;
-    normal_f = normalize((normalTransform * vec4(normal, 0)).xyz);
 }
