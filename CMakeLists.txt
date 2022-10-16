@@ -15,7 +15,7 @@ add_subdirectory(glad)
 add_subdirectory(lib)
 add_subdirectory(submodules)
 
-set_property(TARGET glfw glad stb_image APPEND_STRING PROPERTY 
+set_property(TARGET glfw glad stb_image assimp APPEND_STRING PROPERTY 
     COMPILE_FLAGS -w
 )
 
