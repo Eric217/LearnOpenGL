@@ -39,7 +39,7 @@ void Camera::zoom(float degreeDiff) {
 static mat4 myLookAt(const vec3 &pos, const vec3 &target, const vec3 &up) {
     /// camera 看向 -z，因此 view space coordinate 的 z 轴实际是 camera 看的反方向！
     auto D = pos - target;
-    auto R = cross(up, D);
+    auto R = normalize(cross(up, D));
     auto U = cross(D, R);
     mat4 id(1.f);
     id = translate(id, -pos);

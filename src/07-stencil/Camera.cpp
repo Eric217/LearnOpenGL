@@ -19,21 +19,31 @@ glm::vec3 Camera::move(MoveInstruction instruction) const {
         case BACKWARD:
             return -front;
         case RIGHT:
-            return cross(front, upVec);
+            return normalize(cross(front, upVec));
         case LEFT:
-            return cross(upVec, front);
+            return normalize(cross(upVec, front));
     }
 }
 
+constexpr float MAX_PITCH = 89.f / 180 * M_PI;
+constexpr float MIN_PITCH = -89.f / 180 * M_PI;
+
 void Camera::rotate(float pitchDiff, float yawDiff) {
+    if (pitchDiff > MAX_PITCH) {
+        pitchDiff = MAX_PITCH;
+    } else if (pitchDiff < MIN_PITCH) {
+        pitchDiff = MIN_PITCH;
+    }
     front.y = std::sin(pitchDiff);
     front.x = std::cos(pitchDiff) * std::cos(yawDiff);
     front.z = std::cos(pitchDiff) * std::sin(yawDiff);
     front = normalize(front);
+    moved = true;
 }
 
 void Camera::zoom(float degreeDiff) {
     fov = std::min(179.f, std::max(2.f, (fov + degreeDiff)));
+    moved = true;
 }
 
 static mat4 myLookAt(const vec3 &pos, const vec3 &target, const vec3 &up) {
@@ -47,6 +57,8 @@ static mat4 myLookAt(const vec3 &pos, const vec3 &target, const vec3 &up) {
     r = transpose(r);
     return mat4(r) * id;
 }
+
+#define USING_GLM_LOOK_AT 0
 
 glm::mat4 Camera::getViewMatrix() const {
 #if !USING_GLM_LOOK_AT

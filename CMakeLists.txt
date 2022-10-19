@@ -8,7 +8,7 @@ find_package(PkgConfig QUIET)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set(CMAKE_CXX_STANDARD 17)
-
+set(BUILD_SHARED_LIBS ON)
 
 add_subdirectory(glfw)
 add_subdirectory(glad)
@@ -16,7 +16,7 @@ add_subdirectory(lib)
 add_subdirectory(submodules)
 
 set_property(TARGET glfw glad stb_image assimp APPEND_STRING PROPERTY 
-    COMPILE_FLAGS -w
+    COMPILE_FLAGS " -w"
 )
 
 add_subdirectory(src)
