@@ -91,9 +91,9 @@ void Renderer::render(Scene& scene) {
     glStencilFunc(GL_ALWAYS, 1, 0xff);
     glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
     floor.draw(*shader);
-    
-    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-    
+ 
+    glStencilOp(GL_KEEP, GL_REPLACE, GL_REPLACE);
+    shader->use();
     obj1.draw(*shader);
     obj2.draw(*shader);
     
@@ -117,8 +117,28 @@ void Renderer::render(Scene& scene) {
     glStencilFunc(GL_ALWAYS, 1, 0xff);
     glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
     
+    grassShader->use();
+    grassShader->setMat4("view", viewM);
+    grassShader->setMat4("projection", projectionM);
+    grassShader->setVec3("pointLights[0].position", lightPos);
+    scene.models[5].draw(*grassShader);
+    
+    shader->use();
+    
+    std::vector<Model *> grasses;
+    for (int i = 6; i < scene.models.size(); i++) {
+        grasses.push_back(&scene.models[i]);
+    }
+    std::sort(grasses.begin(), grasses.end(), [this](Model *a, Model *b) {
+        auto dist = viewM * vec4(a->randomVertex(), 1);
+        auto dist2 = viewM * vec4(b->randomVertex(), 1);
+        return dot(dist, dist) < dot(dist2, dist2);
+    });
+    for (auto i = grasses.rbegin(); i != grasses.rend(); i++) {
+        (*i)->draw(*shader);
+    }
+   
     glBindVertexArray(vao);
-
     // 画灯
     lampShader->use();
     lampShader->setMat4("model", model2M);
@@ -131,7 +151,9 @@ void Renderer::render(Scene& scene) {
 Renderer::Renderer() {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_STENCIL_TEST);
-
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
     
@@ -153,8 +175,13 @@ Renderer::Renderer() {
     shader = new Shader(dir + "/v.shader", dir + "/f.shader");
     lampShader = new Shader(dir + "/v_light.shader", dir + "/f_light.shader");
     borderShader = new Shader(dir + "/v.shader", dir + "/f_border.shader");
+    grassShader = new Shader(dir + "/v.shader", dir + "/f_grass.shader");
+
+    shaders.push_back(shader);
+    shaders.push_back(lampShader);
+    shaders.push_back(borderShader);
+    shaders.push_back(grassShader);
     
-    shader->use();
  
     {
         auto light2 = PointLight();
@@ -165,7 +192,10 @@ Renderer::Renderer() {
         light2.k0 = 1;
         light2.k1 = 0.0002;
         light2.k2 = 0.000002;
+        shader->use();
         light2.applyToShader(shader, "pointLights[0].");
+        grassShader->use();
+        light2.applyToShader(grassShader, "pointLights[0].");
     }
     
 }
@@ -180,14 +210,10 @@ Renderer::~Renderer() {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glDeleteBuffers(1, &ebo);
  
-    if (shader) {
-        delete shader;
-    }
-    if (lampShader) {
-        delete lampShader;
-    }
-    if (borderShader) {
-        delete borderShader;
+    for (Shader *shader: shaders) {
+        if (shader) {
+            delete shader;
+        }
     }
     for (Texture *t: textures) {
         if (t) {

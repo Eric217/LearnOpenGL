@@ -34,9 +34,11 @@ struct Vertex {
 class Mesh {
 public:
     glm::mat4 transform;
+    
 public:
     /// move 构造
-    Mesh(std::vector<Vertex> &v, std::vector<GLuint> &i, std::vector<Texture> &t, const glm::mat4 &transform):
+    Mesh(std::vector<Vertex> &v, std::vector<GLuint> &i, std::vector<Texture> &t, const glm::mat4 &transform,
+         GLenum wrap): wrap(wrap),
         vertices(std::move(v)), indices(std::move(i)),
         textures(std::move(t)), transform(transform)
     {
@@ -50,6 +52,8 @@ public:
         transform = t;
         update();
     }
+    const glm::vec3& randomVertex() { return usingVertices[0].position; };
+
 private:
     std::vector<Vertex> vertices;
     std::vector<Vertex> usingVertices;
@@ -57,7 +61,8 @@ private:
     std::vector<Texture> textures;
     
     GLuint vao, vbo, ebo;
-    
+    GLenum wrap;
+
 private:
     void setup();
     void makeUsingVertices();
@@ -68,16 +73,19 @@ private:
 class Model {
 
 public:
-    Model(const std::string& path, const glm::mat4 &transform): modelMat(transform) { load(path); };
+    Model(const std::string& path, const glm::mat4 &transform,
+          GLenum wrap = GL_REPEAT): modelMat(transform), wrap(wrap)
+        { load(path); };
     void draw(const Shader &shader) const;
     void updateTransform(const glm::mat4 &transform);
-
+    const glm::vec3& randomVertex() { return meshes[0].randomVertex(); };
 public:
     glm::mat4 modelMat;
-
+    
 private:
     std::vector<Mesh> meshes;
     std::string directory;
+    GLenum wrap;
     
 private:
     class Node {

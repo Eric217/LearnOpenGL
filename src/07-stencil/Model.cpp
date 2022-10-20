@@ -67,6 +67,7 @@ Mesh::Mesh(Mesh &&mesh) {
     vao = mesh.vao;
     vbo = mesh.vbo;
     ebo = mesh.ebo;
+    wrap = mesh.wrap;
     vertices = std::move(mesh.vertices);
     indices = std::move(mesh.indices);
     textures = std::move(mesh.textures);
@@ -86,7 +87,7 @@ void Mesh::draw(const Shader &shader) const {
     auto diffNr = 0, specNr = 0;
     
     for (auto i = 0; i < textures.size(); i++) {
-        textures[i].use(i);
+        textures[i].use(i, wrap);
         // material.texture_diffuse0
         if (textures[i].type == DIFFUSE_TEXTURE_PREFIX) {
             auto s = textures[i].type + std::to_string(diffNr++);
@@ -175,7 +176,7 @@ void Model::processNode(const aiScene* scene, aiNode *node, Node &mynode) {
                                 std::make_move_iterator(vec.end()));
             }
         }
-        meshes.push_back(Mesh(vertices, indices, textures, modelMat));
+        meshes.push_back(Mesh(vertices, indices, textures, modelMat, wrap));
         mynode.meshes.push_back(&meshes[meshes.size() - 1]);
     }
     for (int i = 0; i < node->mNumChildren; i++) {

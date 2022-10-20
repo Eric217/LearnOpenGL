@@ -19,4 +19,8 @@ set_property(TARGET glfw glad stb_image assimp APPEND_STRING PROPERTY
     COMPILE_FLAGS " -w"
 )
 
+set_property(TARGET assimp glm_shared unit PROPERTY
+    FOLDER "lib"
+)
+
 add_subdirectory(src)

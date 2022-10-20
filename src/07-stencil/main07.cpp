@@ -63,7 +63,7 @@ int main() {
     std::string modelDir = MODEL_DIR;
     auto trans = mat4(1.f);
     auto trans1 = vec3(-2.4, 0.01, 0.5);
-    const float borderW = 1.1;
+    const float borderW = 1.05;
     trans = translate(trans, trans1);
     scene.addModel(modelDir + "/cube/cube.obj", trans);
     // glm 的调用顺序是反的，先调用平移再缩放（矩阵乘法是 T * S * Mat)
@@ -75,6 +75,13 @@ int main() {
     scene.addModel(modelDir + "/cube/cube.obj", scale(translate(mat4(1), trans1), vec3(borderW)));
     
     scene.addModel(modelDir + "/floor/floor.obj", mat4(1.f));
+    // 这个用 grass shader
+    float _x = 0;
+    scene.addModel(modelDir + "/quadr/quadr.obj", translate(mat4(1), vec3(_x, 0, 1.8)), GL_CLAMP_TO_EDGE);
+    // 这几个窗户用普通 shader
+    scene.addModel(modelDir + "/quadr/quadr.obj", translate(mat4(1), vec3(_x, 0, 0.1)), GL_CLAMP_TO_EDGE);
+    scene.addModel(modelDir + "/quadr/quadr.obj", translate(mat4(1), vec3(_x, 0, -4.1)), GL_CLAMP_TO_EDGE);
+    scene.addModel(modelDir + "/quadr/quadr.obj", translate(mat4(1), vec3(_x, 0, 3.53)), GL_CLAMP_TO_EDGE);
 
     // 灯的位置
     auto mat2 = translate(identityM, vec3(0.5f, 5.f, 1.7f));

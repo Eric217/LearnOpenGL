@@ -22,9 +22,11 @@
 
 // 生成并配置好一个纹理对象，用于 bind
 
-void Texture::use(int index) const {
+void Texture::use(int index, GLenum wrap) const {
     glActiveTexture(GL_TEXTURE0 + index);
     glBindTexture(GL_TEXTURE_2D, ID);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap);
 }
 
 static std::unordered_map<std::string, Texture> textureCache;
@@ -45,9 +47,9 @@ Texture::Texture(const std::string &path, const std::string &t): ID(0), type(t) 
     glGenTextures(1, &ID);
     glBindTexture(GL_TEXTURE_2D, ID);
    
-    // 设置纹理 wrap 方式
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    // 设置纹理 wrap 方式、放大放小插值方式
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
  
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -70,7 +72,7 @@ Texture::Texture(const std::string &path, const std::string &t): ID(0), type(t) 
         return;
     }
     // 生成 0 level 的纹理
-    glTexImage2D(GL_TEXTURE_2D, 0/*level*/, GL_RGB, w, h, 0, sourceFormat,
+    glTexImage2D(GL_TEXTURE_2D, 0/*level*/, sourceFormat, w, h, 0, sourceFormat,
                  GL_UNSIGNED_BYTE, data);
     // 生成其他 level 可以重复上个方法，或者直接：
     glGenerateMipmap(GL_TEXTURE_2D);
@@ -84,20 +86,3 @@ Texture::~Texture() {
     // 由于有 cache 暂不设计释放纹理内存逻辑
     // glDeleteTextures(1, &ID);
 }
-
-//Texture::Texture(Texture&& t) {
-//    ID = t.ID;
-//    type = std::move(t.type);
-//}
-//
-//Texture& Texture::operator=(Texture&& t) {
-//    ID = t.ID;
-//    type = std::move(t.type);
-//    return *this;
-//}
-//
-//Texture& Texture::operator=(Texture& t) {
-//    ID = t.ID;
-//    type = (t.type);
-//    return *this;
-//}

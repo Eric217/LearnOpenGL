@@ -22,8 +22,8 @@
 class Scene {
     friend class Renderer;
 public:
-    void addModel(const std::string& path, const glm::mat4 &trans) {
-        models.push_back(Model(path, trans));
+    void addModel(const std::string& path, const glm::mat4 &trans, GLenum wrap = GL_REPEAT) {
+        models.push_back(Model(path, trans, wrap));
     }
     
 //    void addLight
@@ -49,10 +49,14 @@ private:
     GLuint vbo;
     GLuint vao;
     GLuint ebo;
+    
     Shader *shader;
     Shader *lampShader;
     Shader *borderShader;
+    Shader *grassShader;
+    
     std::vector<Texture *> textures;
+    std::vector<Shader *> shaders;
 };
 
 

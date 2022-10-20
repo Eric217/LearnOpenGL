@@ -70,28 +70,30 @@ uniform mat4 view; // vertex shader 的 view matrix
 out vec4 color;
 
 
-vec4 calcPointLight(PointLight light);
-vec4 calcSpotLight(SpotLight light);
-vec4 calcDirectionalLight(DirLight light);
+vec3 calcPointLight(PointLight light);
+vec3 calcSpotLight(SpotLight light);
+vec3 calcDirectionalLight(DirLight light);
 
 void main() {
-    vec4 result = vec4(0);
+    vec3 result = vec3(0);
    
     for (int i = 0; i < NR_POINT_LIGHTS; i++) {
         result += calcPointLight(pointLights[i]);
     }
    
-    color = result;
+    color = vec4(result, 1);
 }
 
 /// 其他参数：Payload frag, Material material, MVP
-vec4 calcPointLight(PointLight light) {
-    vec4 tex_color = vec4(1, 1, 1, 1);
+vec3 calcPointLight(PointLight light) {
+    vec3 tex_color = vec3(1, 1, 1);
     if (material.use_texture_diffuse0) {
-        tex_color = texture(material.texture_diffuse0, frag.tex_coor);
+        vec4 texel = texture(material.texture_diffuse0, frag.tex_coor);
+        if (texel.a < 0.1) {
+            discard;
+        }
+        tex_color = texel.xyz;
     }
-    vec3 tex_color3 = tex_color.rgb;
-
     // eye space coor
     vec3 toLight = (view * vec4(light.position, 1) - vec4(frag.pos, 1)).xyz;
     vec3 toLightN = normalize(toLight); 
@@ -101,24 +103,24 @@ vec4 calcPointLight(PointLight light) {
     float distance = length(toLight);
     float attenuation = 1.0 
         / (light.k0 + light.k1 * distance + light.k2 * distance * distance);
-        
-    vec3 amb = light.ambient * tex_color3 * 0.5;
-    vec3 diff = cos * light.diffuse * tex_color3;
+
+    vec3 amb = light.ambient * tex_color * 0.5;
+    vec3 diff = cos * light.diffuse * tex_color;
     // 高光
     vec3 halfV = normalize((toLightN) + toEye);
     
-    tex_color3 = vec3(1, 1, 1);
+    tex_color = vec3(1, 1, 1);
     if (material.use_texture_specular0) {
-        tex_color3 = texture(material.texture_specular0, frag.tex_coor).xyz;
+        tex_color = texture(material.texture_specular0, frag.tex_coor).xyz;
     }
     // 使用半程而不是反射（Blinn 区别）
     float cos2 = dot(halfV, frag.normal);
     vec3 spec;
     float shininess = 150;
     if (cos > 0 && cos2 > 0 && dot(toEye, frag.normal) > 0) {
-        spec = pow(cos2, shininess) * light.specular * tex_color3;
+        spec = pow(cos2, shininess) * light.specular * tex_color;
     } else {
         spec = vec3(0);
     }
-    return vec4((amb + diff + spec) * attenuation, tex_color.a);
+    return (amb + diff + spec) * attenuation; 
 }

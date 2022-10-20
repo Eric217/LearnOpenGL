@@ -5,10 +5,8 @@ set(_src
     Texture.h Texture.cpp Camera.h Camera.cpp
     Light.h Light.cpp Model.hpp Model.cpp
 )
-set(_shaders 
-    shaders/v.shader shaders/f.shader
-    shaders/f_light.shader shaders/v_light.shader f_border.shader
-)
+
+file(GLOB_RECURSE _shaders ${CMAKE_CURRENT_SOURCE_DIR}/shaders/*)
 
 file(GLOB_RECURSE _models ${CMAKE_CURRENT_SOURCE_DIR}/models/*)
 

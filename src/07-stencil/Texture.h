@@ -9,6 +9,7 @@
 #define Texture_hpp
 
 #include <string>
+#include <glad/glad.h>
 
 class Texture {
 public:
@@ -24,7 +25,7 @@ public:
     ~Texture();
 
     /// 绑定到第几个纹理单元，参数 0 代表 GL_TEXTURE0
-    void use(int index) const;
+    void use(int index, GLenum wrap = GL_REPEAT) const;
 
 protected:
     Texture(const std::string &path, const std::string &type);
