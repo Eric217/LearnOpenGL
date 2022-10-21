@@ -58,18 +58,42 @@ float vertices[] = {
  
 using namespace glm;
 
-// glDepthMask(0);
+/*
+Stencil Testing
+ frag shader -> depth test -> stencil test -> blending
+ 模板缓冲中每个 stencil value 一般是 8bit，256个取值范围。
+ 描边思路：
+ 1 把地板画上
+ 2 把物体画上，更新 stencil buffer 1
+ 3 放大物体，关掉深度、只画 stencil = 0 的部分，用单独的 frag shader
+ 相关：后面再画新物体仍会挡住描边
 
-static mat4 & makeScale(mat4 &mat, float value) {
-    mat[0][0] = value;
-    mat[1][1] = value;
-    mat[2][2] = value;
-    return mat;
-}
+Blending
+ 两个 test 通过后，用该 frag color 与 buffer color 进行 blend，使用指定的混合函数。
+ blending 思路：
+ 先绘制所有不参加混合的 即不透明物体；对透明物体对 eye 距离排序再混合，
+ 这一点比较难做，物体可能部分重合、可能需要每像素考虑等等，
+ 有次序无关透明度(Order Independent Transparency, OIT)
+  
+Face culling
+ 实现算法：
+ 如果用面的法线与视线的夹角（大于 90 度剔除）太复杂；
+ 用 shoelace algorithm 思路：vertex shader 之后直接用该算法对三个点计算面积，如果面积为负数则是在 back 剔除。算法：https://www.youtube.com/watch?v=wpNef1Nu4pA ，算法固定逆时针处理三个点，得出来的是正数则是正面，负数是反面。
+
+ */
 
 void Renderer::render(Scene& scene) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
+    glEnable(GL_CULL_FACE);
+    glBindVertexArray(vao);
+    // 画灯
+    lampShader->use();
+    lampShader->setMat4("model", model2M);
+    lampShader->setMat4("view", viewM);
+    lampShader->setMat4("projection", projectionM);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+    
     shader->use();
     
     shader->setMat4("view", viewM);
@@ -90,10 +114,12 @@ void Renderer::render(Scene& scene) {
     
     glStencilFunc(GL_ALWAYS, 1, 0xff);
     glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+    glFrontFace(GL_CW);
     floor.draw(*shader);
  
     glStencilOp(GL_KEEP, GL_REPLACE, GL_REPLACE);
     shader->use();
+    glFrontFace(GL_CCW);
     obj1.draw(*shader);
     obj2.draw(*shader);
     
@@ -117,6 +143,7 @@ void Renderer::render(Scene& scene) {
     glStencilFunc(GL_ALWAYS, 1, 0xff);
     glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
     
+    glDisable(GL_CULL_FACE);
     grassShader->use();
     grassShader->setMat4("view", viewM);
     grassShader->setMat4("projection", projectionM);
@@ -137,15 +164,6 @@ void Renderer::render(Scene& scene) {
     for (auto i = grasses.rbegin(); i != grasses.rend(); i++) {
         (*i)->draw(*shader);
     }
-   
-    glBindVertexArray(vao);
-    // 画灯
-    lampShader->use();
-    lampShader->setMat4("model", model2M);
-    lampShader->setMat4("view", viewM);
-    lampShader->setMat4("projection", projectionM);
-
-    glDrawArrays(GL_TRIANGLES, 0, 36);
 }
 
 Renderer::Renderer() {
