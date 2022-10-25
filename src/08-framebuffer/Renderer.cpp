@@ -46,10 +46,8 @@ void Renderer::render2(Scene& scene) {
     auto &shader = mirror.prepareDrawing();
     shader.setInt("screen.width", fb.w);
     shader.setInt("screen.height", fb.h);
-    
-    glDisable(GL_DEPTH_TEST);
+
     mirror.draw();
-    glEnable(GL_DEPTH_TEST);
 }
 
 void Renderer::render1(Scene& scene) {

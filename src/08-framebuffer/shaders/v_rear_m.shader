@@ -11,9 +11,6 @@ struct Payload {
 out Payload frag;
 
 void main() {
-    vec4 vecPos4 = vec4(pos, 1);
-    
     frag.tex_coor = texCoor;
-
-    gl_Position = vecPos4;
+    gl_Position = vec4(pos.xy, -1, 1);
 }

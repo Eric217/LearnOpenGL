@@ -83,7 +83,7 @@ Scene config::loadScene() {
     float w_p = 0.2;
     // 三角形 x 从 -1～1 搞到 -0.2～0.2
     // 三角形 y 从 -1～1 搞到 0.6~1
-    //       z 固定 -1
+    //       z 固定 -1（model 内可能不是 -1，下面设置 -1 可能没用，在 shader 中设
     auto t = translate(mat4(1), vec3(0, 1 - w_p, 0))
         * scale(mat4(1), vec3(w_p, w_p, -1));
     scene.rearMirror = std::shared_ptr<Model>(new Model(
