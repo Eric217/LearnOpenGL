@@ -23,18 +23,21 @@ void Renderer::render(Scene& scene, const Camera *camera) {
     projectionM = config::projectionMatrix(camera->fov);
     viewM = camera->getViewMatrix();
 
-    render1(scene);
+    render1(scene, camera);
 }
  
-void Renderer::render1(Scene& scene) {
+void Renderer::render1(Scene& scene, const Camera *camera) {
     glClearColor(0.1f, 0.1f, 0.1f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
  
     {
-        auto &model = scene.modelAt(0);
-        auto &shader = model.prepareDrawing();
-        applyViewProjectionMatrix(shader);
-        model.draw();
+        for (int i = 0; i < scene.models.size(); i++) {
+            auto &model = scene.modelAt(i);
+            auto &shader = model.prepareDrawing();
+            applyViewProjectionMatrix(shader);
+            shader.setVec3("cameraPos", camera->position);
+            model.draw();
+        }
     }
     
     if (scene.skybox) {

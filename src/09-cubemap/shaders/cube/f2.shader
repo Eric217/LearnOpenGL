@@ -1,6 +1,14 @@
 #version 330 core
 
+out vec4 color;
+
 struct Material {
+    bool use_texture_diffuse0;
+    sampler2D texture_diffuse0;
+
+    bool use_texture_specular0;
+    //sampler2D texture_specular0;
+    
     sampler2D texture_cubemap2d0;
     sampler2D texture_cubemap2d1;
     sampler2D texture_cubemap2d2;
@@ -13,25 +21,37 @@ struct Material {
 };
 
 uniform Material material;
- 
+
+uniform vec3 cameraPos;
+
 struct Payload {
-    vec3 tex_coor; // pos without translation
+    vec2 tex_coor;
+    vec3 raw_pos; // world space coor
+    vec3 raw_normal; // world space coor
 };
 
 in Payload frag;
 
-out vec4 color;
- 
+vec4 getColor(vec3 tex_coor);
+
 void main() {
+    vec3 outdir = refract(normalize(frag.raw_pos - cameraPos),
+                          normalize(frag.raw_normal), 1.0/1.5);
+    
+    vec4 texel = getColor(outdir);
+    
+    color = texel;
+}
+
+vec4 getColor(vec3 tex_coor) {
     if (material.use_texture_cubemap0) {
-        color = texture(material.texture_cubemap0, frag.tex_coor);
-        return;
+        return texture(material.texture_cubemap0, tex_coor);
     }
     // 找到长度最大的分量 确定要采样的纹理
-    vec3 coorA = abs(frag.tex_coor);
-    float p = frag.tex_coor.p;
-    float s = frag.tex_coor.s;
-    float t = frag.tex_coor.t;
+    vec3 coorA = abs(tex_coor);
+    float p = tex_coor.p;
+    float s = tex_coor.s;
+    float t = tex_coor.t;
 
     float m;
     vec4 texel = vec4(0);
@@ -62,6 +82,5 @@ void main() {
             texel = texture(material.texture_cubemap2d5, vec2(1-(s/m + 1)*0.5,  (t/m+1)*0.5));
         }
     }
-   
-    color = texel;
+    return texel;
 }

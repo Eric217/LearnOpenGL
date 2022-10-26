@@ -11,9 +11,12 @@
 #include <string>
 #include <glad/glad.h>
 
+// shader 中纹理顺序必须按下面顺序摆放，激活单元绑定时按这个顺序绑定
 #define DIFFUSE_TEXTURE "texture_diffuse"
 #define SPECULAR_TEXTURE "texture_specular"
+#define CUBEMAP2D_TEXTURE "texture_cubemap2d"
 #define CUBEMAP_TEXTURE "texture_cubemap"
+#define CUBEMAP2D_TEXTURE "texture_cubemap2d"
 
 class Texture {
 public:

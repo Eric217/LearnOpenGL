@@ -65,6 +65,7 @@ public:
 private:
     void setup();
     void makeUsingVertices();
+    void sortTextures();
     void update();
 
     void updateTexture(GLuint Id) { textures[0].ID = Id; }
@@ -92,6 +93,7 @@ public:
     void updateTexture(GLuint Id) { meshes[0].updateTexture(Id); }
     /// move
     void setTextures(std::vector<Texture> &&textures);
+    void appendTextures(const std::vector<Texture> &textures);
     
 public:
     glm::mat4 modelMat;

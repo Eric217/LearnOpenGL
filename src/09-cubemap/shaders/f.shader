@@ -7,8 +7,19 @@ struct Material {
 
     bool use_texture_specular0;
     sampler2D texture_specular0;
+    
+    sampler2D texture_diffuse1;
+    sampler2D texture_diffuse2;
+    sampler2D texture_diffuse3;
+    sampler2D texture_diffuse4;
+    sampler2D texture_diffuse5;
+    sampler2D texture_diffuse5;
+
+    bool use_texture_cubemap0;
+    samplerCube texture_cubemap0;
 };
 
+uniform Material material;
 uniform Material material;
 
 struct DirLight {

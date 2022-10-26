@@ -16,8 +16,8 @@
 using namespace config;
 using namespace glm;
 
-int config::initWindowPointSizeW = 900;
-int config::initWindowPointSizeH = 720;
+int config::initWindowPointSizeW = 700;
+int config::initWindowPointSizeH = 560;
 
 int config::screenPixelW = 0;
 int config::screenPixelH = 0;
@@ -31,21 +31,22 @@ Scene config::loadScene() {
 
     Scene scene;
  
+    std::vector<Texture> cubemapTextures;
+
     // skybox
     {
         auto boxShader = Shader(shaderDir + "/skybox/v.shader", shaderDir + "/skybox/f.shader");
         auto box = new Model(modelDir + "/skybox/skybox.obj", id4, GL_CLAMP_TO_EDGE, boxShader, false);
         
-        std::vector<Texture> ts;
         for (int i = 0; i < 6; i++) {
             auto path = modelDir + "/skybox/" + std::to_string(i) + ".jpg";
-            ts.push_back(Texture::load(path, DIFFUSE_TEXTURE, false));
-            ts[i].shouldUse = !useCubemap;
+            cubemapTextures.push_back(Texture::load(path, CUBEMAP2D_TEXTURE, false));
+            cubemapTextures[i].shouldUse = !useCubemap;
         }
         CubeTexture cube(modelDir + "/skybox/");
         cube.shouldUse = useCubemap;
-        ts.push_back(std::move(cube));
-        box->setTextures(std::move(ts));
+        cubemapTextures.push_back(std::move(cube));
+        box->appendTextures(cubemapTextures);
          
         scene.skybox.reset(box);
     }
@@ -53,9 +54,19 @@ Scene config::loadScene() {
     // cube
     {
         auto shader = Shader(shaderDir + "/cube/v.shader", shaderDir + "/cube/f.shader");
-        scene.addModel(modelDir + "/cube/cube.obj",
-                       scale(translate(id4, vec3(0.1,0.1,-0.2)), vec3(0.34)),
-                       shader);
+        auto m = new Model(modelDir + "/cube/cube.obj",
+                           scale(translate(id4, vec3(0.1,1.1,0)), vec3(0.64)),
+                           GL_REPEAT, shader);
+        m->appendTextures(cubemapTextures);
+        scene.addModel(m);
+    }
+    {
+        auto shader = Shader(shaderDir + "/cube/v.shader", shaderDir + "/cube/f2.shader");
+        auto m = new Model(modelDir + "/cube/cube.obj",
+                           scale(translate(id4, vec3(-0.2,3.1,0)), vec3(0.64)),
+                           GL_REPEAT, shader);
+        m->appendTextures(cubemapTextures);
+        scene.addModel(m);
     }
     return scene;
 }

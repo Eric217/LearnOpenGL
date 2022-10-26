@@ -35,7 +35,7 @@ public:
 private:
     void applyViewProjectionMatrix(const Shader &shader) const;
     
-    void render1(Scene& scene);
+    void render1(Scene& scene, const Camera *camera);
     
 };
 

@@ -9,7 +9,8 @@
 
 void Mesh::setup() {
     makeUsingVertices();
-
+    sortTextures();
+    
     GLuint buffers[2];
     glGenBuffers(2, buffers);
     vbo = buffers[0];
@@ -94,7 +95,7 @@ void Mesh::draw(const Shader &shader) const {
     glBindVertexArray(vao);
 
     // 每个纹理绑到一个槽位上，按照类型绑到不同的 uniform sampler 上
-    auto diffNr = 0, specNr = 0, cubeNr = 0;
+    auto diffNr = 0, specNr = 0, cubeNr = 0, cube2dNr = 0;
     
     for (auto i = 0; i < textures.size(); i++) {
         textures[i].use(i, wrap);
@@ -110,11 +111,29 @@ void Mesh::draw(const Shader &shader) const {
             auto s = textures[i].type + std::to_string(cubeNr++);
             shader.setInt(samplerNamePrefix + s, i);
             shader.setBool(useSamplerNamePrefix + s, textures[i].shouldUse);
+        } else if (textures[i].type == CUBEMAP2D_TEXTURE) {
+            auto s = textures[i].type + std::to_string(cube2dNr++);
+            shader.setInt(samplerNamePrefix + s, i);
+            shader.setBool(useSamplerNamePrefix + s, textures[i].shouldUse);
         } else {
             assert(false); // 未处理!
         }
     }
     glDrawElements (GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
+}
+
+#include <map>
+static std::map<std::string, int> texture_order = {
+    {DIFFUSE_TEXTURE, 0},
+    {SPECULAR_TEXTURE, 1},
+    {CUBEMAP2D_TEXTURE, 2},
+    {CUBEMAP_TEXTURE, 3},
+};
+
+void Mesh:: sortTextures() {
+    std::sort(textures.begin(), textures.end(), [](Texture &left, Texture& right) {
+        return texture_order[left.type] < texture_order[right.type];
+    });
 }
 
 // MARK: - Model
@@ -208,6 +227,12 @@ void Model::updateTransform(const glm::mat4 &transform) {
 
 void Model::setTextures(std::vector<Texture> &&textures) {
     meshes[0].textures = textures;
+    meshes[0].sortTextures();
+}
+
+void Model:: appendTextures(const std::vector<Texture> &textures) {
+    meshes[0].textures.insert(meshes[0].textures.end(), textures.begin(), textures.end());
+    meshes[0].sortTextures();
 }
 
 void Model::load(const std::string &path) {

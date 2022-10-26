@@ -29,6 +29,10 @@ void Texture::use(int index, GLenum wrap) const {
 
     if (type == CUBEMAP_TEXTURE) {
         glBindTexture(GL_TEXTURE_CUBE_MAP, ID);
+    } else if (type == CUBEMAP2D_TEXTURE) {
+        glBindTexture(GL_TEXTURE_2D, ID);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     } else {
         glBindTexture(GL_TEXTURE_2D, ID);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap);
