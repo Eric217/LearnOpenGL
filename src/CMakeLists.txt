@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.20.0)
 
+set(GLOBAL_MODEL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/06-model/models")
+
 # add_subdirectory(01)
 # add_subdirectory(02-shader)
 # add_subdirectory(03-texture)
@@ -8,4 +10,5 @@ cmake_minimum_required(VERSION 3.20.0)
 # add_subdirectory(06-model)
 # add_subdirectory(07-stencil)
 # add_subdirectory(08-framebuffer)
-add_subdirectory(09-cubemap)
+# add_subdirectory(09-cubemap)
+add_subdirectory(10-geometry)
