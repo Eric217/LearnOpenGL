@@ -28,7 +28,8 @@ class Renderer {
     UniformBufferM4 vBuffer;
     UniformBufferM4 pBuffer;
     UniformBuffer3f camBuffer;
-    
+    UniformBuffer3f explodeBuffer;
+
 public:
     Renderer(const Scene &scene);
     ~Renderer();

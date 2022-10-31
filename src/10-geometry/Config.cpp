@@ -50,16 +50,16 @@ Scene config::loadScene() {
 
         scene.skybox.reset(box);
     }
-    
+    auto none = std::string();
     auto triangle = shaderDir + "/triangle.gs";
     auto explode = shaderDir + "/explode.gs";
     auto normal = shaderDir + "/normal.gs";
-#define GEOMETRY_SHADER triangle
+    std::string *arr[4] = {&none, &triangle, &explode, &normal};
     
     // models
     {
         auto shader = Shader(shaderDir + "/nano/v.vs", shaderDir + "/nano/f.fs",
-                             GEOMETRY_SHADER);
+                             *arr[GEOMETRY_SHADER]);
         auto m = new Model(nanosuitDir, shader,
                            scale(translate(id4, vec3(0.1,1.1,0)), vec3(0.64)));
         m->appendTextures(cubemapTextures);
@@ -67,7 +67,7 @@ Scene config::loadScene() {
     }
     {
         auto shader = Shader(shaderDir + "/cube/v.vs", shaderDir + "/cube/f.fs",
-                             GEOMETRY_SHADER);
+                             *arr[GEOMETRY_SHADER]);
         scene.addModel(modelDir + "/cube/cube.obj",
                        scale(translate(id4, vec3(0.2,9.1,2.7)), vec3(0.64)),
                        shader);

@@ -58,7 +58,7 @@ int main() {
         auto frameTime = glfwGetTime();
         frameDuration = frameTime - lastTime;
         lastTime = frameTime;
-        usleep(12 * 1000); // CPU 占用太高了
+        usleep(14 * 1000); // CPU 占用太高了
     }
     delete renderer;
     delete camera;
@@ -130,7 +130,7 @@ static void processMouse(GLFWwindow*, double x, double y) {
     static double mouseSpeed = 0.003;
     double pitch = -mouseSpeed * y;
     double yaw = mouseSpeed * x;
-    camera->rotate(pitch, yaw - M_PI_2);
+    camera->rotate(pitch, yaw);
 }
 
 /// offset 是相对值；y 负代表缩小

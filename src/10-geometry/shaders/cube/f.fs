@@ -17,5 +17,9 @@ in Payload {
 void main() {
     // 只做一个漫反射
     color = texture(material.texture_diffuse0, frag.tex_coor);
+    
+    if (!gl_FrontFacing) {
+        color = 0.5 * color + vec4(0.5, 0.5, 0.5, 1);
+    }
 }
  

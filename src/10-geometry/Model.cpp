@@ -123,6 +123,8 @@ void Mesh::draw(const Shader &shader) const {
 }
 
 #include <map>
+#include <iostream>
+
 static std::map<std::string, int> texture_order = {
     {DIFFUSE_TEXTURE, 0},
     {SPECULAR_TEXTURE, 1},
@@ -134,6 +136,12 @@ void Mesh:: sortTextures() {
     std::sort(textures.begin(), textures.end(), [](Texture &left, Texture& right) {
         return texture_order[left.type] < texture_order[right.type];
     });
+        
+    std::string orders("texture orders:");
+    for (Texture &t : textures) {
+        orders.append(std::to_string(texture_order[t.type]) + ", ");
+    }
+    std::cout << orders << std::endl;
 }
 
 // MARK: - Model

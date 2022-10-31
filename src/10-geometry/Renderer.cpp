@@ -16,12 +16,14 @@
 #include <math.h>
 #include <algorithm>
 #include <vector>
+#include <chrono>
 
 using namespace glm;
 
 #define UNIFORM_VIEW 0
 #define UNIFORM_PROJECTION 1
 #define UNIFORM_CAM 2
+#define UNIFORM_EXPLODE 3
 
 void Renderer::render(Scene& scene, const Camera *camera) {
     projectionM = config::projectionMatrix(camera->fov);
@@ -31,6 +33,13 @@ void Renderer::render(Scene& scene, const Camera *camera) {
     pBuffer.update(0, projectionM);
     camBuffer.update(camera->position);
     
+    if (GEOMETRY_SHADER > 1) { // explode & normal
+        auto value = (duration_cast<std::chrono::milliseconds>
+                  (std::chrono::system_clock::now().time_since_epoch())).count();
+        float co = 1+std::sin((value % 4000) / 4000.f * 2 * M_PI);
+        explodeBuffer.update(0, GEOMETRY_SHADER == 2
+                             ? co * 0.29 : (co * 0.18 + 0.02));
+    }
     render1(scene, camera);
 }
  
@@ -40,9 +49,6 @@ void Renderer::render1(Scene& scene, const Camera *camera) {
  
     {
         for (int i = 0; i < scene.models.size(); i++) {
-            auto &shader = scene.modelAt(i).prepareDrawing();
-            shader.setMat4("view", viewM);
-            shader.setMat4("projection", projectionM);
             scene.modelAt(i).draw(true);
         }
     }
@@ -66,7 +72,7 @@ void Renderer::updateScreenSize(int w, int h) {
 
 Renderer::Renderer(const Scene &scene) {
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
+    // glEnable(GL_CULL_FACE);
     glLineWidth(3);
     
     // 手动定义槽位意义：绑定好相关的全局 uniform，ubo
@@ -77,6 +83,7 @@ Renderer::Renderer(const Scene &scene) {
         model.get()->shader.use();
         model.get()->bindUniformBlock("View", UNIFORM_VIEW);
         model.get()->bindUniformBlock("Projection", UNIFORM_PROJECTION);
+        model.get()->bindUniformBlock("Explosion", UNIFORM_EXPLODE);
     }
     // 其他特殊处理
     if (scene.skybox) {
@@ -86,10 +93,11 @@ Renderer::Renderer(const Scene &scene) {
     }
     scene.models[0].get()->shader.use();
     scene.models[0].get()->bindUniformBlock("Uniforms", UNIFORM_CAM);
-
+    
     vBuffer.bindRange(0, sizeof(mat4), UNIFORM_VIEW);
     pBuffer.bindRange(0, sizeof(mat4), UNIFORM_PROJECTION);
     camBuffer.bindRange(0, sizeof(vec3), UNIFORM_CAM);
+    explodeBuffer.bindRange(0, sizeof(float), UNIFORM_EXPLODE);
 }
 
 Renderer::~Renderer() {

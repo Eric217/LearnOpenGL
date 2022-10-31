@@ -10,6 +10,9 @@
 
 #include <glm/glm.hpp>
 
+//  1 triangle | 2 explode | 3 normal | 0 none
+#define GEOMETRY_SHADER 1
+
 class Scene;
 class Camera;
 

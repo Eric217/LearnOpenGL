@@ -16,7 +16,6 @@
 #define SPECULAR_TEXTURE "texture_specular"
 #define CUBEMAP2D_TEXTURE "texture_cubemap2d"
 #define CUBEMAP_TEXTURE "texture_cubemap"
-#define CUBEMAP2D_TEXTURE "texture_cubemap2d"
 
 class Texture {
 public:

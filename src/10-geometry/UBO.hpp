@@ -37,6 +37,7 @@ struct UniformBuffer3f: UniformBuffer {
     UniformBuffer3f();
     
     void update(const glm::vec3 &v);
+    void update(int index, float value);
 };
 
 #endif /* UBO_hpp */

@@ -37,3 +37,9 @@ void UniformBuffer3f::update(const glm::vec3 &v) {
     glBufferSubData (GL_UNIFORM_BUFFER, 0, sizeof(vec3), value_ptr(v));
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
+
+void UniformBuffer3f::update(int index, float value) {
+    glBindBuffer(GL_UNIFORM_BUFFER, ID);
+    glBufferSubData (GL_UNIFORM_BUFFER, index * sizeof(float), sizeof(float), &value);
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+}

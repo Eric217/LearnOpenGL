@@ -25,8 +25,8 @@ glm::vec3 Camera::move(MoveInstruction instruction) const {
     }
 }
 
-constexpr float MAX_PITCH = 89.f / 180 * M_PI;
-constexpr float MIN_PITCH = -89.f / 180 * M_PI;
+constexpr float MAX_PITCH = M_PI_2;
+constexpr float MIN_PITCH = -M_PI_2;
 
 void Camera::rotate(float pitchDiff, float yawDiff) {
     if (pitchDiff > MAX_PITCH) {
@@ -34,6 +34,7 @@ void Camera::rotate(float pitchDiff, float yawDiff) {
     } else if (pitchDiff < MIN_PITCH) {
         pitchDiff = MIN_PITCH;
     }
+    yawDiff -= M_PI_2;
     front.y = std::sin(pitchDiff);
     front.x = std::cos(pitchDiff) * std::cos(yawDiff);
     front.z = std::cos(pitchDiff) * std::sin(yawDiff);
