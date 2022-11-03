@@ -2,8 +2,8 @@
 #include "Camera.h"
 #include "Config.hpp"
 #include <glad/glad.h>
-#include <GLFW/glfw3.h>
 #include <unistd.h>
+#include <GLFW/glfw3.h>
 
 static void framebuffer_size_change(GLFWwindow *window, int w, int h);
 static void processKey(GLFWwindow *window);

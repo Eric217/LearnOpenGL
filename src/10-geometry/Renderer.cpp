@@ -19,6 +19,7 @@
 #include <chrono>
 
 using namespace glm;
+using namespace config;
 
 #define UNIFORM_VIEW 0
 #define UNIFORM_PROJECTION 1
@@ -51,6 +52,9 @@ void Renderer::render1(Scene& scene, const Camera *camera) {
         for (int i = 0; i < scene.models.size(); i++) {
             scene.modelAt(i).draw(true);
         }
+        auto &model = scene.modelAt(0);
+        auto &shader = *shader2;
+        model.draw(shader);
     }
     
     if (scene.skybox) {
@@ -85,6 +89,12 @@ Renderer::Renderer(const Scene &scene) {
         model.get()->bindUniformBlock("Projection", UNIFORM_PROJECTION);
         model.get()->bindUniformBlock("Explosion", UNIFORM_EXPLODE);
     }
+    shader2->use();
+    shader2->bindUniformBlock("View", UNIFORM_VIEW);
+    shader2->bindUniformBlock("Projection", UNIFORM_PROJECTION);
+    shader2->bindUniformBlock("Explosion", UNIFORM_EXPLODE);
+    shader2->bindUniformBlock("Uniforms", UNIFORM_CAM);
+
     // 其他特殊处理
     if (scene.skybox) {
         scene.skybox.get()->shader.use();

@@ -1,4 +1,3 @@
-- cubemap
-    - skybox
-    - lighting
-
+- geometry shader
+    - normal
+    - wireframe

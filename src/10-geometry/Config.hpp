@@ -11,10 +11,11 @@
 #include <glm/glm.hpp>
 
 //  1 triangle | 2 explode | 3 normal | 0 none
-#define GEOMETRY_SHADER 1
+#define GEOMETRY_SHADER 3
 
 class Scene;
 class Camera;
+class Shader;
 
 namespace config {
 
@@ -23,6 +24,7 @@ extern int initWindowPointSizeH;
 
 extern int screenPixelW;
 extern int screenPixelH;
+extern Shader *shader2;
 
 Scene loadScene();
 

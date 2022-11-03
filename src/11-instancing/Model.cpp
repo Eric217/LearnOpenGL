@@ -36,11 +36,16 @@ void Mesh::setup() {
 
 void Mesh::makeUsingVertices() {
     bool usePush = usingVertices.size() != vertices.size();
-    if (usePush) {
-        usingVertices.clear();
-    }
     auto normalMat = glm::transpose(glm::inverse(transform));
     
+    if (usePush) {
+        usingVertices.clear();
+        if (normalMat == mat4(1)) {
+            usingVertices = vertices;
+            return;
+        }
+    }
+     
     for (int i = 0; i < vertices.size(); i++) {
         if (usePush) {
             auto v = vertices[i];
@@ -91,9 +96,7 @@ Mesh::~Mesh() {
 static std::string samplerNamePrefix = "material.";
 static std::string useSamplerNamePrefix = "material.use_";
 
-void Mesh::draw(const Shader &shader) const {
-    glBindVertexArray(vao);
-
+void Mesh::applyTextures(const Shader &shader) const {
     // 每个纹理绑到一个槽位上，按照类型绑到不同的 uniform sampler 上
     auto diffNr = 0, specNr = 0, cubeNr = 0, cube2dNr = 0;
     
@@ -119,6 +122,11 @@ void Mesh::draw(const Shader &shader) const {
             assert(false); // 未处理!
         }
     }
+}
+
+void Mesh::draw(const Shader &shader) const {
+    glBindVertexArray(vao);
+    applyTextures(shader);
     glDrawElements (GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
 }
 

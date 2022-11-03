@@ -1,4 +1,4 @@
 - cubemap
     - skybox
-    - lighting
+    - environment mapping
 

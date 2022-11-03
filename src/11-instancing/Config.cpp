@@ -21,13 +21,13 @@ int config::initWindowPointSizeH = 560;
 
 int config::screenPixelW = 0;
 int config::screenPixelH = 0;
-Shader* config::shader2 = 0;
 
 #define useCubemap 0
 
 Scene config::loadScene() {
-    const std::string modelDir = MODEL_DIR;
-    const std::string nanosuitDir = GLOBAL_MODEL_DIR"/nanosuit/nanosuit.obj";
+    const std::string modelDir = SKY_MODEL_DIR;
+    const std::string planetDir = GLOBAL_MODEL_DIR"/planet/planet.obj";
+    const std::string rockDir = GLOBAL_MODEL_DIR"/rock/rock.obj";
     const std::string shaderDir = SHADER_DIR;
 
     Scene scene;
@@ -51,42 +51,35 @@ Scene config::loadScene() {
 
         scene.skybox.reset(box);
     }
-    auto none = std::string();
-    auto triangle = shaderDir + "/triangle.gs";
-    auto explode = shaderDir + "/explode.gs";
-    auto normal = shaderDir + "/normal.gs";
-    std::string *arr[4] = {&none, &triangle, &explode, &normal};
-    
+   
     // models
     {
-        auto shader = Shader(shaderDir + "/nano/v.vs", shaderDir + "/nano/f.fs",
-                             *arr[0]);
-        shader2 = new Shader(shaderDir + "/nano/v.vs", shaderDir + "/nano/f.fs",
-                             *arr[GEOMETRY_SHADER]);
-        auto m = new Model(nanosuitDir, shader,
-                           scale(translate(id4, vec3(0.1,1.1,0)), vec3(0.64)));
-        m->appendTextures(cubemapTextures);
+        auto shader = Shader(shaderDir + "/rock/v.vs", shaderDir + "/rock/f.fs");
+        auto m = new Model(rockDir, shader);
         scene.addModel(m);
     }
     {
-        auto shader = Shader(shaderDir + "/cube/v.vs", shaderDir + "/cube/f.fs",
-                             *arr[GEOMETRY_SHADER]);
-        scene.addModel(modelDir + "/cube/cube.obj",
-                       scale(translate(id4, vec3(0.2,9.1,2.7)), vec3(0.64)),
-                       shader);
+        auto shader = Shader(shaderDir + "/planet/v.vs", shaderDir + "/planet/f.fs");
+        scene.addModel(planetDir, scale(id4, vec3(1)), shader);
     }
     return scene;
 }
 
 mat4 config::projectionMatrix(float fovDegree) {
-    return perspective(radians(fovDegree), 1.f * screenPixelW / screenPixelH, 0.1f, 100.f);
+    return perspective(radians(fovDegree), 1.f * screenPixelW / screenPixelH, 0.1f, 200.f);
 }
 
 Camera* config::loadCamera() {
     auto camera = new Camera();
-    camera->position = vec3(0.f, 4.5f, 10.3f);
+    camera->position = vec3(0.f, 4.5f, 20.3f);
     camera->front = normalize(vec3(0.f, 0.f, -1.f));
     camera->upVec = vec3(0.f, 1.f, 0.f);
     camera->fov = 38;
     return camera;
 }
+
+#if NDEBUG
+#else
+std::map<int, size_t> EfficiencyTool::TIMES;
+std::map<int, size_t> EfficiencyTool::TOTAL;
+#endif
