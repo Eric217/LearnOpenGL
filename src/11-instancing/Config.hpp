@@ -21,6 +21,8 @@ extern int initWindowPointSizeH;
 extern int screenPixelW;
 extern int screenPixelH;
 
+extern float cameraStep;
+
 Scene loadScene();
 
 /// 调用者负责 delete

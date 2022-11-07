@@ -98,6 +98,7 @@ int main() {
         auto frameTime = glfwGetTime();
         frameDuration = frameTime - lastTime;
         lastTime = frameTime;
+        usleep(11 * 1000);
     }
     delete renderer;
     delete camera;

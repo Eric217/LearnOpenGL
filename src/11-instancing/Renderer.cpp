@@ -39,7 +39,7 @@ static GLuint instanceBuffer;
 
 static auto arr = new mat4[INSTANCE_COUNT]();
 static mat4 id4(1);
-static float radius = 15;
+static float radius = 20;
 
 void Renderer::setup(const Scene &scene) {
     EfficiencyTool tool(0, 0);
@@ -49,15 +49,15 @@ void Renderer::setup(const Scene &scene) {
     glBindBuffer(GL_ARRAY_BUFFER, instanceBuffer);
     for (int i = 0; i < INSTANCE_COUNT; i++) {
         int r1 = rand() % 360;
-        int r2 = rand() % 20;
-        float arg1 = (r2-10) * 0.3f;
-        float arg2 = (r1-180) * 0.013f;
+        int r2 = rand() % 22;
+        float arg1 = (rand() % 100 - 50) * 0.08f;
+        float arg2 = (rand() % 100 - 50) * 0.08f;
         float theta = r1 * M_PI / 180;
         // 随便写的 transform
         arr[i] = rotate(scale(translate(id4,
-            vec3(std::sin(theta) * radius + arg1, (r1 % 20 - 10) * 0.2f, std::cos(theta) * radius) + arg2),
+            vec3(std::sin(theta) * radius + arg1, ((rand()) % 20 - 10) * 0.15f, std::cos(theta) * radius) + arg2),
             glm::vec3((r2 % 22) / 100.0f + 0.03)), // scale
-            (float)r1, vec3(r1,r2,r1)); // rotate
+            (float)r1, vec3(r1,arg1,arg2)); // rotate
     }
     glBufferData (GL_ARRAY_BUFFER, sizeof(mat4) * INSTANCE_COUNT, arr, GL_STREAM_DRAW);
 }

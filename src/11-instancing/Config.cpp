@@ -22,6 +22,8 @@ int config::initWindowPointSizeH = 560;
 int config::screenPixelW = 0;
 int config::screenPixelH = 0;
 
+float config::cameraStep = 15;
+
 #define useCubemap 0
 
 Scene config::loadScene() {
@@ -60,7 +62,7 @@ Scene config::loadScene() {
     }
     {
         auto shader = Shader(shaderDir + "/planet/v.vs", shaderDir + "/planet/f.fs");
-        scene.addModel(planetDir, scale(id4, vec3(1)), shader);
+        scene.addModel(planetDir, scale(id4, vec3(1.45)), shader);
     }
     return scene;
 }
@@ -71,7 +73,7 @@ mat4 config::projectionMatrix(float fovDegree) {
 
 Camera* config::loadCamera() {
     auto camera = new Camera();
-    camera->position = vec3(0.f, 4.5f, 20.3f);
+    camera->position = vec3(0.f, 4.5f, 30.3f);
     camera->front = normalize(vec3(0.f, 0.f, -1.f));
     camera->upVec = vec3(0.f, 1.f, 0.f);
     camera->fov = 38;

@@ -91,7 +91,7 @@ static vec3 freeMove(const vec3 &dir) {
 
 /// 期望在 o 往 d 方向移动，处理碰撞检测等业务逻辑后返回实际移动向量
 static vec3 resolve(const vec3 &origin, const vec3 &direction) {
-    float delta = frameDuration * 4;
+    float delta = frameDuration * config::cameraStep;
 #if FPS_STYLE
     return fpsMove(direction) * delta;
 #else
