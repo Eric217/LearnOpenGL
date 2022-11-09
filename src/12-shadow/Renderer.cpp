@@ -50,7 +50,8 @@ void Renderer::setup(const Scene &scene) {
         auto dir = normalize(light.direction);
         auto pos = -30.f * dir;
         auto v = lookAt(pos, pos + dir, vec3(0, 1, 0));
-        auto pv = ortho(-20.f, 20.f, -20.f, 20.f, 0.1f, config::cameraFarPlane) * v;
+        float frustum = 15.f; // 视锥外面都视为无阴影
+        auto pv = ortho(-frustum, frustum, -frustum, frustum, 0.1f, config::cameraFarPlane) * v;
         light.Light::shader.setMat4("vpMatrix", pv);
         dirLightBuffer.update(1 + 2 * i, pv);
         
@@ -78,12 +79,14 @@ void Renderer::render(Scene& scene, const Camera *camera) {
     vBuffer.update(1, config::projectionMatrix(camera->fov));
     
     auto dirLights = scene.getLights<Sun>();
-
+    // 除非没有平面物体产生阴影的需求 否则不要用这个！
+    glCullFace(GL_FRONT);
     for (int i = 0; i < dirShadowMaps.size(); i++) {
         dirShadowMaps[i].activate();
         render1(scene, 0, &dirLights[i]->Light::shader);
         dirShadowMaps[i].deactivate();
     }
+    glCullFace(GL_BACK);
     glViewport(0, 0, screenPixelW, screenPixelH);
  
 #if USE_DEPTH_PREVIEW
@@ -114,7 +117,8 @@ Renderer::Renderer(const Scene &scene):
 {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_FRAMEBUFFER_SRGB);
-    // glEnable(GL_CULL_FACE);
+    // 我觉得 cull 效果反而不好，不如 bias？
+//    glEnable(GL_CULL_FACE);
 
     glClearColor(0.01f, 0.01f, 0.01f, 1.f);
 

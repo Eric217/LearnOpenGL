@@ -105,21 +105,6 @@ void main() {
     //color = vec4(pow(result, vec3(1/2.2)), 1);
 }
  
-bool inDirLightShadow(mat4 trans, vec3 toLightN) {
-    if (!lights.use_texture_dirLight0) {
-        return false;
-    }
-    vec4 lightSpacePos = trans * frag.pos_world;
-    /// get [-1, 1] pos
-    vec3 ndcPos = lightSpacePos.xyz / lightSpacePos.w;
-    /// [0-1] pos
-    ndcPos = ndcPos * 0.5 + 0.5;
-    float depth = texture(lights.texture_dirLight0, ndcPos.xy).r;
-    // 用系数 0.001，最小 0.0002 就行，但为了表演 Peter Panning 调大点
-    float bias = max(0.0002, (1 - abs(dot(frag.normal, toLightN))) * 0.005);
-    return ndcPos.z > depth + bias;
-}
-
 /// 其他参数：Payload frag, Material material, MVP
 vec3 calcPointLight(PointLight light) {
     vec3 tex_color = vec3(0);
@@ -200,7 +185,45 @@ vec3 calcSpotLight(SpotLight light) {
     }
     return (amb + diff + spec) * attenuation;
 }
+ 
+/// 完全在阴影中返回 1
+float dirLightShadow(mat4 trans, vec3 toLightN) {
+   if (!lights.use_texture_dirLight0) {
+       return 0;
+   }
+   vec4 lightSpacePos = trans * frag.pos_world;
+   /// get [-1, 1] pos
+   vec3 ndcPos = lightSpacePos.xyz / lightSpacePos.w;
+   /// [0-1] pos
+   ndcPos = ndcPos * 0.5 + 0.5;
+   // 视锥短，外面的视为无阴影
+   if (ndcPos.z > 1) {
+       return 0;
+   }
+   //float depth = texture(lights.texture_dirLight0, ndcPos.xy).r;
+   //// 系数为了表演 Peter Panning 可以调大点
+   //float bias = max(0.0001, (1 - abs(dot(frag.normal, toLightN))) * 0.00035);
+   //return ndcPos.z > depth + bias;
+   
+   int kernel_size = 3;
+   int half_s = kernel_size / 2;
+   vec2 wh_step = 1.0 / textureSize(lights.texture_dirLight0, 0);
+   int totalShadow = 0;
+   // 感觉效果不太行
+   float bias = max(0.0006, (1 - abs(dot(frag.normal, toLightN))) * 0.0015);
 
+   for (int i = 0; i < kernel_size; i++) {
+       for (int j = 0; j < kernel_size; j++) {
+           float newX = (i - half_s) * wh_step.x + ndcPos.x;
+           float newY = (j - half_s) * wh_step.y + ndcPos.y;
+           
+           float depth = texture(lights.texture_dirLight0, vec2(newX, newY)).r;
+           totalShadow += int(ndcPos.z > depth + bias);
+       }
+   }
+   return float(totalShadow) / (kernel_size * kernel_size);
+}
+ 
 /// 其他参数：Payload frag, Material material, MVP
 vec3 calcDirectionalLight(DirLight light) {
     vec3 tex_color = vec3(0);
@@ -229,8 +252,6 @@ vec3 calcDirectionalLight(DirLight light) {
     } else {
         spec = vec3(0);
     }
-    if (inDirLightShadow(light.trans, toLightN)) {
-        return amb;
-    }
-    return amb + diff + spec;
+    float pcf = 1 - dirLightShadow(light.trans, toLightN);
+    return amb + pcf * (diff + spec);
 }
