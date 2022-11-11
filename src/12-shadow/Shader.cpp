@@ -39,6 +39,11 @@ void Shader::setVec3(const std::string &name, const glm::vec3& value) const {
     glUniform3fv(loc, 1, glm::value_ptr(value));
 }
 
+void Shader::setVec4(const std::string &name, const glm::vec4& value) const {
+    auto loc = glGetUniformLocation(ID, name.c_str());
+    glUniform4fv(loc, 1, glm::value_ptr(value));
+}
+
 void Shader::setFloat(const std::string &name, float value) const {
     auto loc = glGetUniformLocation(ID, name.c_str());
     glUniform1f(loc, value);
@@ -107,13 +112,13 @@ static GLuint makeShader(const char *path, GLenum type) {
 static std::unordered_map<std::string, unsigned int> shaders;
 
 /// 返回 program id，参数 vs fs not null，gs nullable
-static GLuint makeProgram(const char *vs, const char *fs, const char *gs) {
+static GLuint makeProgram(const char *vs, const char *fs, const char *gs, bool reuse) {
     std::string key = std::string(vs) + "::" + fs;
     if (gs) {
         key.append(std::string("::") + gs);
     }
     auto found = shaders.find(key);
-    if (found != shaders.end()) {
+    if (reuse && found != shaders.end()) {
         return found->second;
     }
     
@@ -145,18 +150,19 @@ static GLuint makeProgram(const char *vs, const char *fs, const char *gs) {
     if (s3) {
         glDeleteShader(s3);
     }
-    if (ID) {
+    if (reuse && ID) {
         shaders.emplace(key, ID);
     }
     return ID;
 }
 
 Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath,
-       const std::string& geometryPath) {
+       const std::string& geometryPath, bool reuse) {
     ID = makeProgram(vertexPath.c_str(), fragmentPath.c_str(),
-                     geometryPath.empty() ? 0 : geometryPath.c_str());
+             geometryPath.empty() ? 0 : geometryPath.c_str(), reuse);
 }
 
-Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath) {
-    ID = makeProgram(vertexPath.c_str(), fragmentPath.c_str(), 0);
+Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath, bool reuse) {
+    ID = makeProgram(vertexPath.c_str(), fragmentPath.c_str(), 0,
+                     reuse);
 }

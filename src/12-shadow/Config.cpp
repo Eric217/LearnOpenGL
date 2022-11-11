@@ -36,8 +36,9 @@ Scene config::loadScene() {
     // cubes
     {
         auto shader = Shader(shaderDir + "/object/v.vs", shaderDir + "/object/f.fs");
-        vec3 positions[3] = { {2, 1.001, -4},    {-3, 0.002, 3}, {0, 0.33, 0} };
-        vec3 scales[3] =    { {1.2, 2, 1.25}, {1, 1, 1},{1.3, 1.3, 1.3}};
+        // 在屏幕上分别是 3, 1, 2
+        vec3 positions[3] = { {2, -0.1501, -4.6},    {-3, 1.3001, 3}, {0, 0.1003, 0} };
+        vec3 scales[3] =    { {1.03, 0.85, 1.03}, {1, 2.3, 1},{1.1, 1.1, 1.1}};
         for (int i = 0; i<3; i++) {
             scene.addModel(cubeDir,
                 scale(translate(id4, positions[i]), scales[i]),
@@ -47,7 +48,7 @@ Scene config::loadScene() {
     // floor
     {
         auto shader = Shader(shaderDir + "/object/v.vs", shaderDir + "/object/f.fs");
-        auto m = new Model(floorDir, shader);
+        auto m = new Model(floorDir, shader, scale(id4, vec3(1.15, 1, 1.15)));
         scene.addModel(m);
     }
     // lights
@@ -56,16 +57,18 @@ Scene config::loadScene() {
         vec3 dir = normalize(pos);
         auto mat = translate(id4, -pos) *
                     scale(id4, vec3(10.f, 10.f, 10.f));
-        auto lightShader = Shader(shaderDir + "/light/v.vs", shaderDir + "/light/f.fs");
-        auto shadowShader = Shader(shaderDir + "/shadow/dir.vs", shaderDir + "/shadow/dir.fs");
+        auto lightShader = Shader(shaderDir + "/light/v.vs", shaderDir + "/light/f.fs", false);
+        auto shadowShader = Shader(shaderDir + "/shadow/dir.vs", shaderDir + "/shadow/dir.fs", false);
 
         Sun *sunPtr = new Sun(cubeDir, lightShader, mat);
+        sunPtr->setTextures({});
+        
         auto &light = *sunPtr;
         light.name = "dirLights";
         light.direction = dir;
         light.ambient = vec3(255, 198, 107)/255.f;
         light.diffuse = light.ambient;
-        light.specular = vec3(1);
+        light.specular = light.ambient;
         light.Light::shader = shadowShader;
         
         std::shared_ptr<Sun> ptr(sunPtr);
@@ -73,23 +76,27 @@ Scene config::loadScene() {
         scene.addModel(ptr);
     }
     {
-#define ENABLE_POINT_LIGHT 0
+#define ENABLE_POINT_LIGHT 1
 #if ENABLE_POINT_LIGHT
-        auto mat2 = translate(id4, vec3(0.5f, 5.f, 1.7f));
-        mat2 *= scale(id4, vec3(0.3f, 0.3f, 0.3f));
-        auto lightShader = Shader(shaderDir + "/light/v.vs", shaderDir + "/light/f.fs");
+        auto mat = translate(id4, vec3(0.59f, 1.8f, -2.45f));
+        mat *= scale(id4, vec3(0.16f, 0.16f, 0.16f));
+        auto lightShader = Shader(shaderDir + "/light/v.vs", shaderDir + "/light/f.fs", false);
+        auto shadowShader = Shader(shaderDir + "/shadow/p.vs", shaderDir + "/shadow/p.fs", shaderDir + "/shadow/p.gs", false);
 
-        Bulb *bulbPtr = new Bulb(cubeDir, mat2);
+        Bulb *bulbPtr = new Bulb(cubeDir, mat);
+        bulbPtr->setTextures({});
+        
         auto &bulb = *bulbPtr;
-        bulb.shader = lightShader;
+        bulb.Model:: shader = lightShader;
+        bulb.Light:: shader = shadowShader;
         
         bulb.name = "pointLights";
         bulb.ambient = vec3(1);
         bulb.diffuse = vec3(1);
         bulb.specular = vec3(1);
         bulb.k0 = 1;
-        bulb.k1 = 0.0005;
-        bulb.k2 = 0.00004;
+        bulb.k1 = 0.00004;
+        bulb.k2 = 0.00001;
 
         std::shared_ptr<Bulb> ptr(bulbPtr);
         scene.addLight(ptr);
@@ -101,7 +108,11 @@ Scene config::loadScene() {
 }
 
 mat4 config::projectionMatrix(float fovDegree) {
-    return perspective(radians(fovDegree), 1.f * screenPixelW / screenPixelH, 0.1f, cameraFarPlane);
+    return glm::perspective(radians(fovDegree), 1.f * screenPixelW / screenPixelH, 0.1f, cameraFarPlane);
+}
+
+mat4 config::perspective(float fovDegree, float whRatio, float near, float far) {
+    return glm::perspective(radians(fovDegree), whRatio, near, far);
 }
 
 Camera* config::loadCamera() {

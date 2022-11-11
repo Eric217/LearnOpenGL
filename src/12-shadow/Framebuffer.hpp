@@ -12,38 +12,57 @@
 #include <glad/glad.h>
 
 class Framebuffer {
-protected:
-    GLuint Id;
-    GLuint texId; // for color，子类可能用途不一样
-    GLuint rbo; // for depth and stencil，子类可能用途不一样
 public:
     int w, h;
     
 public:
-    Framebuffer(int w, int h);
-    
     virtual ~Framebuffer() {};
-    
-    GLuint asTexture() const { return texId; }
-    
+     
     void activate() const {
         glBindFramebuffer(GL_FRAMEBUFFER, Id);
         glViewport(0, 0, w, h);
     };
     void deactivate() const { glBindFramebuffer(GL_FRAMEBUFFER, 0); };
     
-    virtual void updateSize(int w, int h);
+    virtual void updateSize(int w, int h) = 0;
+    virtual GLuint asTexture() const = 0;
     
 protected:
-    Framebuffer() {};
+    GLuint Id;
+protected:
     
+};
+
+class NormalFramebuffer: public Framebuffer {
+    GLuint texId; // for color
+    GLuint rbo; // for depth and stencil
+public:
+    NormalFramebuffer(int w, int h);
+ 
+    GLuint asTexture() const { return texId; }
+    void updateSize(int w, int h);
+
 };
 
 class DepthFramebuffer: public Framebuffer {
+    GLuint texId; // for depth
 
 public:
     DepthFramebuffer(int w, int h);
+    
     void updateSize(int w, int h);
+    GLuint asTexture() const { return texId; }
 };
+
+class CubeDepthFramebuffer: public Framebuffer {
+    GLuint texId; // for depth
+
+public:
+    CubeDepthFramebuffer(int w, int h);
+    
+    void updateSize(int w, int h);
+    GLuint asTexture() const { return texId; }
+};
+
 
 #endif /* Framebuffer_hpp */

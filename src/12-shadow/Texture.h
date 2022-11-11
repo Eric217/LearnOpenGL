@@ -17,6 +17,7 @@
 #define CUBEMAP2D_TEXTURE "texture_cubemap2d"
 #define CUBEMAP_TEXTURE "texture_cubemap"
 #define DIR_LIGHT_TEXTURE "texture_dirLight"
+#define POINT_LIGHT_TEXTURE "texture_pointLight"
 
 class Texture {
 public:

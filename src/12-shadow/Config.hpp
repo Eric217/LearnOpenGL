@@ -30,6 +30,7 @@ Scene loadScene();
 Camera* loadCamera();
 
 glm::mat4 projectionMatrix(float fovDegree);
+glm::mat4 perspective(float fovDegree, float whRatio, float near, float far);
 
 
 }

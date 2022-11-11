@@ -35,9 +35,10 @@ void Texture::use(int index, GLenum wrap) const {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     } else if (type == DIR_LIGHT_TEXTURE) {
         glBindTexture(GL_TEXTURE_2D, ID);
-        // 默认就是 border
-        //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-        //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+        // 已设置默认参数
+    } else if (type == POINT_LIGHT_TEXTURE) {
+        glBindTexture(GL_TEXTURE_CUBE_MAP, ID);
+        // 已设置默认参数
     } else {
         glBindTexture(GL_TEXTURE_2D, ID);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap);

@@ -10,6 +10,9 @@ file(GLOB_RECURSE _shaders ${CMAKE_CURRENT_SOURCE_DIR}/shaders/*)
 
 file(GLOB_RECURSE _models ${CMAKE_CURRENT_SOURCE_DIR}/models/*)
 
+list(FILTER _models EXCLUDE REGEX "\.DS_Store")
+list(FILTER _shaders EXCLUDE REGEX "\.DS_Store")
+
 set(_all ${_src} ${_shaders} ${_models})
 
 set(CMAKE_CXX_STANDARD 20)

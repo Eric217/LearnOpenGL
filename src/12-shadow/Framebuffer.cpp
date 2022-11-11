@@ -8,7 +8,7 @@
 #include "Framebuffer.hpp"
 #include <iostream>
 
-void Framebuffer::updateSize(int w, int h) {
+void NormalFramebuffer::updateSize(int w, int h) {
     this->w = w;
     this->h = h;
     glBindFramebuffer(GL_FRAMEBUFFER, Id);
@@ -22,8 +22,9 @@ void Framebuffer::updateSize(int w, int h) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-Framebuffer::Framebuffer(int w, int h): w(w), h(h) {
-        
+NormalFramebuffer::NormalFramebuffer(int w, int h) {
+    this->w = w;
+    this->h = h;
     glGenFramebuffers(1, &Id);
     // 可以指定读/写缓冲命令作用到不同的缓冲，一般使用同一个 GL_FRAMEBUFFER
     // GL_READ_FRAMEBUFFER | GL_DRAW_FRAMEBUFFER
@@ -55,7 +56,7 @@ Framebuffer::Framebuffer(int w, int h): w(w), h(h) {
     // attach
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
     
-    // MARK: - check
+    // check
     auto checkResult = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (checkResult != GL_FRAMEBUFFER_COMPLETE) {
         std::cout << "ERROR::FRAMEBUFFER::INCOMPLETE::" << checkResult << std::endl;
@@ -66,7 +67,7 @@ Framebuffer::Framebuffer(int w, int h): w(w), h(h) {
 
 // MARK: - for depth use only
 
-DepthFramebuffer::DepthFramebuffer(int w, int h): Framebuffer() {
+DepthFramebuffer::DepthFramebuffer(int w, int h) {
     this->w = w;
     this->h = h;
     
@@ -88,7 +89,12 @@ DepthFramebuffer::DepthFramebuffer(int w, int h): Framebuffer() {
     
     // attach 到 fb，参数：target、attachment type、texture type、tex、level
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texId, 0);
-    
+    // check
+    auto checkResult = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (checkResult != GL_FRAMEBUFFER_COMPLETE) {
+        std::cout << "ERROR::FRAMEBUFFER::INCOMPLETE::" << checkResult << std::endl;
+        assert(false);
+    }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
@@ -99,11 +105,53 @@ void DepthFramebuffer::updateSize(int w, int h) {
     assert(false);
     glBindTexture(GL_TEXTURE_2D, texId);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
-    // MARK: - check
+    
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+// MARK: - for depth use only
+
+CubeDepthFramebuffer::CubeDepthFramebuffer(int w, int h) {
+    this->w = w;
+    this->h = h;
+    
+    glGenFramebuffers(1, &Id);
+    glBindFramebuffer(GL_FRAMEBUFFER, Id);
+    glReadBuffer(GL_NONE);
+    glDrawBuffer(GL_NONE);
+    
+    glGenTextures(1, &texId);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, texId);
+    for (int i = 0; i < 6; i++) {
+        glTexImage2D (GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
+    }
+   
+    glTexParameteri (GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri (GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    
+    glTexParameteri (GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri (GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri (GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    
+    // attach 到 fb，参数：target、attachment type、tex、level
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texId, 0);
+    // check
     auto checkResult = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (checkResult != GL_FRAMEBUFFER_COMPLETE) {
         std::cout << "ERROR::FRAMEBUFFER::INCOMPLETE::" << checkResult << std::endl;
         assert(false);
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void CubeDepthFramebuffer::updateSize(int w, int h) {
+    this->w = w;
+    this->h = h;
+    glBindFramebuffer(GL_FRAMEBUFFER, Id);
+    assert(false);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, texId);
+    for (int i = 0; i < 6; i++) {
+        glTexImage2D (GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }

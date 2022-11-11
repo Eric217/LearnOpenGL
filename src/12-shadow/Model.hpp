@@ -91,10 +91,7 @@ public:
         meshes(std::move(m.meshes)), directory(std::move(m.directory)),
         wrap(m.wrap), rootNode(std::move(m.rootNode)) {}
 
-    void draw(bool activateShader = false) const {
-        if (activateShader) shader.use();
-        draw(shader);
-    }
+    void draw() const { draw(shader); }
     void draw(const Shader &shader) const;
     Shader& prepareDrawing() { shader.use(); return shader; };
     void applyTextures() const {
@@ -204,8 +201,8 @@ public:
         std::vector<T*> vec;
         for (int i = 0; i < lights.size(); i++) {
             auto p = dynamic_cast<T*>(lights[i].get());
-            assert(p);
-            vec.push_back(p);
+            if (p)
+                vec.push_back(p);
         }
         return vec;
     }

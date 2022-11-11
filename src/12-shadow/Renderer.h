@@ -26,10 +26,12 @@ class Renderer {
     UniformBufferM4 vBuffer;
     /// 4 vec3 + mat4 view
     UniformBufferM4 dirLightBuffer;
-    //UniformBufferM4 dirViewBuffer;
+    UniformBufferM4 pointLightBuffer;
+    UniformBufferM4 cubeMatrices;
     
     std::vector<DepthFramebuffer> dirShadowMaps;
-    
+    std::vector<CubeDepthFramebuffer> pointShadowMaps;
+
 public:
     Renderer(const Scene &scene);
     ~Renderer(){};
