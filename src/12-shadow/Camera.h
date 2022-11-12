@@ -24,6 +24,8 @@ public:
     /// fov
     float fov;
     
+    float exposure = 1;
+    
     bool moved = true;
     
 public:

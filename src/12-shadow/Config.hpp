@@ -24,6 +24,10 @@ extern int screenPixelH;
 extern float cameraStep;
 extern float cameraFarPlane;
 
+extern bool usingHDR;
+extern bool usingSRGB;
+extern bool using_GL_SRGB;
+
 Scene loadScene();
 
 /// 调用者负责 delete

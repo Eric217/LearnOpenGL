@@ -6,6 +6,7 @@
 //
 
 #include "Texture.h"
+#include "Config.hpp"
 
 #include <glad/glad.h>
 #include <stb/stb_image.h>
@@ -60,7 +61,8 @@ Texture Texture::load(const std::string &path, const std::string &type, bool use
     if (type == CUBEMAP_TEXTURE) {
         t = CubeTexture(path);
     } else {
-        t = Texture(path, type, useLevels, type == DIFFUSE_TEXTURE);
+        bool useSRGB = config::usingSRGB && type == DIFFUSE_TEXTURE;
+        t = Texture(path, type, useLevels, useSRGB);
     }
     textureCache[k] = t;
     return t;

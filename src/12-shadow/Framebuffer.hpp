@@ -36,8 +36,9 @@ protected:
 class NormalFramebuffer: public Framebuffer {
     GLuint texId; // for color
     GLuint rbo; // for depth and stencil
+    bool usingHdr;
 public:
-    NormalFramebuffer(int w, int h);
+    NormalFramebuffer(int w, int h, bool hdr = false);
  
     GLuint asTexture() const { return texId; }
     void updateSize(int w, int h);

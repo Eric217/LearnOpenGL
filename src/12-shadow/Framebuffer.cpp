@@ -14,7 +14,9 @@ void NormalFramebuffer::updateSize(int w, int h) {
     glBindFramebuffer(GL_FRAMEBUFFER, Id);
 
     glBindTexture(GL_TEXTURE_2D, texId);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
+    GLenum fmt = usingHdr ? GL_RGB32F : GL_RGB;
+    GLenum srcFmt = usingHdr ? GL_FLOAT : GL_UNSIGNED_BYTE;
+    glTexImage2D (GL_TEXTURE_2D, 0/*level*/, fmt/*internalformat*/, w, h, 0/*border*/, GL_RGB /*data format*/ , GL_FLOAT/*data type*/, 0/*data*/);
     
     glBindRenderbuffer(GL_RENDERBUFFER, rbo);
     glRenderbufferStorage(GL_FRAMEBUFFER, GL_DEPTH24_STENCIL8, w, h);
@@ -22,9 +24,11 @@ void NormalFramebuffer::updateSize(int w, int h) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-NormalFramebuffer::NormalFramebuffer(int w, int h) {
+NormalFramebuffer::NormalFramebuffer(int w, int h, bool hdr) {
     this->w = w;
     this->h = h;
+    usingHdr = hdr;
+    
     glGenFramebuffers(1, &Id);
     // 可以指定读/写缓冲命令作用到不同的缓冲，一般使用同一个 GL_FRAMEBUFFER
     // GL_READ_FRAMEBUFFER | GL_DRAW_FRAMEBUFFER
@@ -35,7 +39,9 @@ NormalFramebuffer::NormalFramebuffer(int w, int h) {
     // 1. color buffer 用 texture 实现（可读，用于采样）
     glGenTextures(1, &texId);
     glBindTexture(GL_TEXTURE_2D, texId);
-    glTexImage2D (GL_TEXTURE_2D, 0/*level*/, GL_RGB /*internalformat*/, w, h, 0/*border*/, GL_RGB /*data format*/ , GL_UNSIGNED_BYTE/*data type*/, 0/*data*/);
+    GLenum fmt = usingHdr ? GL_RGB32F : GL_RGB;
+    GLenum srcFmt = usingHdr ? GL_FLOAT : GL_UNSIGNED_BYTE;
+    glTexImage2D (GL_TEXTURE_2D, 0/*level*/, fmt/*internalformat*/, w, h, 0/*border*/, GL_RGB /*data format*/ , GL_FLOAT/*data type*/, 0/*data*/);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 

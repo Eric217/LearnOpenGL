@@ -220,7 +220,7 @@ float dirLightShadow(mat4 trans, vec3 toLightN) {
    //float bias = max(0.0001, (1 - abs(dot(frag.normal, toLightN))) * 0.00035);
    //return ndcPos.z > depth + bias;
    
-   int kernel_size = 3;
+   int kernel_size = 5;
    int half_s = kernel_size / 2;
    vec2 wh_step = 1.0 / textureSize(lights.texture_dirLight0, 0);
    int totalShadow = 0;

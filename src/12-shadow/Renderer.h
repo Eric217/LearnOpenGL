@@ -15,6 +15,7 @@
 #include "Light.h"
 #include "UBO.hpp"
 #include "Framebuffer.hpp"
+#include "Scene.hpp"
 
 #include <glad/glad.h>
 #include <vector>
@@ -23,6 +24,7 @@
 
 
 class Renderer {
+    ContextUBO context;
     UniformBufferM4 vBuffer;
     /// 4 vec3 + mat4 view
     UniformBufferM4 dirLightBuffer;
@@ -32,6 +34,8 @@ class Renderer {
     std::vector<DepthFramebuffer> dirShadowMaps;
     std::vector<CubeDepthFramebuffer> pointShadowMaps;
 
+    std::shared_ptr<NormalFramebuffer> hdrBuffer;
+    
 public:
     Renderer(const Scene &scene);
     ~Renderer(){};
@@ -42,7 +46,8 @@ public:
 private:
     void setup(const Scene &scene);
     void render1(Scene& scene, const Camera *camera, const Shader *customShader = 0);
-    
+    void render2(Scene& scene, const Camera *camera, const Shader *customShader = 0);
+    const NormalFramebuffer& getHdrBuffer();
 };
 
 

@@ -8,6 +8,7 @@
 #include "Config.hpp"
 #include "Model.hpp"
 #include "Camera.h"
+#include "Scene.hpp"
 
 #include <glad/glad.h>
 #include <vector>
@@ -25,13 +26,17 @@ int config::screenPixelH = 0;
 float config::cameraStep = 6;
 float config::cameraFarPlane = 200;
 
+bool config::usingHDR = true;
+bool config::usingSRGB = true;
+bool config::using_GL_SRGB = true;
+
 Scene config::loadScene() {
     const std::string cubeDir = MODEL_DIR"/cube/cube.obj";
     const std::string floorDir = MODEL_DIR"/floor/floor.obj";
     const std::string shaderDir = SHADER_DIR;
 
     Scene scene;
-    mat4 id4(1.f);
+    const mat4 id4(1.f);
   
     // cubes
     {
@@ -53,10 +58,10 @@ Scene config::loadScene() {
     }
     // lights
     {
-        vec3 pos = 10.f * vec3(5, -7.3, -8);
+        vec3 pos = 5.f * vec3(5, -7.3, -8);
         vec3 dir = normalize(pos);
         auto mat = translate(id4, -pos) *
-                    scale(id4, vec3(10.f, 10.f, 10.f));
+                    scale(id4, vec3(9, 9, 9));
         auto lightShader = Shader(shaderDir + "/light/v.vs", shaderDir + "/light/f.fs", false);
         auto shadowShader = Shader(shaderDir + "/shadow/dir.vs", shaderDir + "/shadow/dir.fs", false);
 
@@ -66,7 +71,7 @@ Scene config::loadScene() {
         auto &light = *sunPtr;
         light.name = "dirLights";
         light.direction = dir;
-        light.ambient = vec3(255, 198, 107)/255.f;
+        light.ambient = vec3(255, 198, 107)/255.f * 0.66f;
         light.diffuse = light.ambient;
         light.specular = light.ambient;
         light.Light::shader = shadowShader;
@@ -79,7 +84,7 @@ Scene config::loadScene() {
 #define ENABLE_POINT_LIGHT 1
 #if ENABLE_POINT_LIGHT
         auto mat = translate(id4, vec3(0.59f, 1.8f, -2.45f));
-        mat *= scale(id4, vec3(0.16f, 0.16f, 0.16f));
+        mat *= scale(id4, vec3(0.1f, 0.1f, 0.1f));
         auto lightShader = Shader(shaderDir + "/light/v.vs", shaderDir + "/light/f.fs", false);
         auto shadowShader = Shader(shaderDir + "/shadow/p.vs", shaderDir + "/shadow/p.fs", shaderDir + "/shadow/p.gs", false);
 
@@ -91,19 +96,26 @@ Scene config::loadScene() {
         bulb.Light:: shader = shadowShader;
         
         bulb.name = "pointLights";
-        bulb.ambient = vec3(1);
-        bulb.diffuse = vec3(1);
-        bulb.specular = vec3(1);
+        bulb.ambient = vec3(21);
+        bulb.diffuse = vec3(21);
+        bulb.specular = vec3(21);
         bulb.k0 = 1;
         bulb.k1 = 0.00004;
-        bulb.k2 = 0.00001;
+        bulb.k2 = 0.000006;
 
         std::shared_ptr<Bulb> ptr(bulbPtr);
         scene.addLight(ptr);
         scene.addModel(ptr);
 #endif
     }
-     
+    if (usingHDR) {
+        auto shader = Shader(SHADER_DIR"/hdr/v.vs", SHADER_DIR"/hdr/f.fs");
+        auto model = new Model(
+            MODEL_DIR"/../../08-framebuffer/models/quadr/quadr.obj",
+            shader, id4, GL_CLAMP_TO_EDGE, false);
+        scene.setHdrQuad(model);
+    }
+    
     return scene;
 }
 
@@ -117,7 +129,7 @@ mat4 config::perspective(float fovDegree, float whRatio, float near, float far) 
 
 Camera* config::loadCamera() {
     auto camera = new Camera();
-    camera->position = vec3(0.f, 4.5f, 10.3f);
+    camera->position = vec3(0.f, 4.5f, 8.3f);
     camera->front = normalize(vec3(0.f, 0.f, -1.f));
     camera->upVec = vec3(0.f, 1.f, 0.f);
     camera->fov = 38;

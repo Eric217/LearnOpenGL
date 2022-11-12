@@ -26,6 +26,7 @@ using namespace config;
 #define BINDING_POINT_DIR_LIGHTS 1
 #define BINDING_POINT_POINT_LIGHTS 2
 #define BINDING_POINT_CUBE_MAT 3
+#define BINDING_POINT_CONTEXT 4
 
 constexpr int dirLightCount = 1;
 constexpr int dirLightMat4Count = 2;
@@ -126,8 +127,7 @@ void Renderer::setup(const Scene &scene) {
     depthMap = new Model(previewModelDir, previewShader, mat4(1), GL_CLAMP_TO_EDGE, false);
     t2.shouldUse = false;
     depthMap->setTextures({t1});
-#endif
-#if USE_CUBE_PREVIEW
+#elif USE_CUBE_PREVIEW
     auto previewShader = Shader(SHADER_DIR"/preview/point.vs", SHADER_DIR"/preview/point.fs");
     std::string previewModelDir = MODEL_DIR"/../../09-cubemap/models/skybox/skybox.obj";
     depthMap = new Model(previewModelDir, previewShader, mat4(1), GL_CLAMP_TO_EDGE, false);
@@ -143,6 +143,7 @@ void Renderer::render(Scene& scene, const Camera *camera) {
 
     vBuffer.update(0, camera->getViewMatrix());
     vBuffer.update(1, config::projectionMatrix(camera->fov));
+    context.updateCameraExposure(usingHDR * camera->exposure);
     
     auto dirLights = scene.getLights<Sun>();
     // 除非没有平面物体产生阴影的需求 否则不要用这个！
@@ -175,8 +176,24 @@ void Renderer::render(Scene& scene, const Camera *camera) {
     depthMap->draw();
     glFrontFace(GL_CCW);
 #else
-    render1(scene, camera);
+    render2(scene, camera);
 #endif
+}
+
+/// HDR pass
+void Renderer::render2(Scene& scene, const Camera *camera, const Shader *customShader) {
+    if (!config::usingHDR) {
+        render1(scene, camera, customShader);
+        return;
+    }
+    getHdrBuffer().activate();
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    render1(scene, camera, customShader);
+    getHdrBuffer().deactivate();
+    
+    glFrontFace(GL_CW);
+    scene.getHdrQuad().draw();
+    glFrontFace(GL_CCW);
 }
 
 /// 渲染 models
@@ -192,17 +209,31 @@ void Renderer::render1(Scene& scene, const Camera *camera, const Shader *customS
 
 void Renderer::updateScreenSize(int w, int h) {
     glViewport(0, 0, w, h);
+    
+    for (int i = 0; i < dirShadowMaps.size(); i++) {
+        dirShadowMaps[i].updateSize(w, h);
+    }
+    for (int i = 0; i < pointShadowMaps.size(); i++) {
+        pointShadowMaps[i].updateSize(w, h);
+    }
+    if (hdrBuffer) {
+        hdrBuffer.get()->updateSize(w, h);
+    }
+    context.updateScreenSize(w, h);
 }
 
 Renderer::Renderer(const Scene &scene):
     vBuffer(2, GL_STREAM_DRAW),
+    context(BINDING_POINT_CONTEXT),
     dirLightBuffer(dirLightMat4Count * dirLightCount, GL_STATIC_DRAW),
     pointLightBuffer(pointLightMat4Count * pointLightCount, GL_STATIC_DRAW),
     cubeMatrices(6, GL_STATIC_DRAW)
 {
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_FRAMEBUFFER_SRGB);
-    // 我觉得 cull 效果反而不好，不如 bias？
+    if (usingSRGB && using_GL_SRGB) {
+        glEnable(GL_FRAMEBUFFER_SRGB);
+    }
+    // 我觉得 cull back 阴影效果反而不好，不如 bias？
     glEnable(GL_CULL_FACE);
 
     glClearColor(0.01f, 0.01f, 0.01f, 1.f);
@@ -223,6 +254,24 @@ Renderer::Renderer(const Scene &scene):
     vBuffer.bindRange(0, 2 * sizeof(mat4), BINDING_POINT_VP);
     dirLightBuffer.bindRange(0, dirLightMat4Count * sizeof(mat4), BINDING_POINT_DIR_LIGHTS);
     pointLightBuffer.bindRange(0, pointLightMat4Count * sizeof(mat4), BINDING_POINT_POINT_LIGHTS);
+     
+    if (usingHDR) {
+        auto &quad = scene.getHdrQuad();
+        quad.setTextures({
+            Texture(getHdrBuffer().asTexture(), DIFFUSE_TEXTURE)});
+        quad.shader.use();
+        quad.bindUniformBlock("Context", BINDING_POINT_CONTEXT);
+    }
+    context.updateScreenSize(screenPixelW, screenPixelH);
     
     setup(scene);
+}
+
+const NormalFramebuffer& Renderer::getHdrBuffer() {
+    if (hdrBuffer) {
+        return *hdrBuffer;
+    }
+    hdrBuffer = std::shared_ptr<NormalFramebuffer>(
+        new NormalFramebuffer(config::screenPixelW, config::screenPixelH, true));
+    return *hdrBuffer;
 }

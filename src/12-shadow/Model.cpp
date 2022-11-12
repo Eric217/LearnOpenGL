@@ -297,17 +297,3 @@ void Bulb::updateTransform(const glm::mat4 &transform) {
     Model::updateTransform(transform);
     position = transform[3];
 }
-
-Scene::ModelArray Scene::allModels() const {
-    ModelArray _models = models;
-    _models.push_back(skybox);
-    return _models;
-}
-
-//const Light& Scene::pointLight() const {
-//    for (int i = 0; i<lights.size(); i++) {
-//        auto p = dynamic_cast<PointLight*>(lights[i].get());
-//        assert(p);
-//        return *p;
-//    }
-//}

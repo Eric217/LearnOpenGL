@@ -3,7 +3,8 @@ set(_target_name 12-shadow)
 set(_src 
     main12.cpp Renderer.cpp Renderer.h Shader.h Shader.cpp Texture.h Camera.h
     Camera.cpp Config.hpp Config.cpp Texture.cpp Light.h Light.cpp Model.hpp
-    Model.cpp UBO.hpp UBO.cpp Framebuffer.hpp Framebuffer.cpp
+    Model.cpp UBO.hpp UBO.cpp Framebuffer.hpp Framebuffer.cpp Scene.hpp
+    Scene.cpp
 )
 
 file(GLOB_RECURSE _shaders ${CMAKE_CURRENT_SOURCE_DIR}/shaders/*)

@@ -32,6 +32,14 @@ struct UniformBufferM4: UniformBuffer {
     void update(int index, const glm::mat4 &m);
     /// 用 vec3 一次更新 16 字节
     void update(int index, const glm::vec3 &row);
+
+    template<typename T>
+    void updateWord(int index, T value) {
+        glBindBuffer(GL_UNIFORM_BUFFER, ID);
+        glBufferSubData (GL_UNIFORM_BUFFER, index * 4, 4, &value);
+        glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    }
+    
 };
 
 /// 管理一个 vec3 的
@@ -40,6 +48,32 @@ struct UniformBuffer3f: UniformBuffer {
     
     void update(const glm::vec3 &v);
     void update(int index, float value);
+};
+
+
+/**
+ 保存一些上下文，和 shader 中结构对应，具体结构：
+    type    name        start   len
+    int     screen_w    0       4
+    int     screen_h    4       4
+    float   exposure    8       4
+ */
+class ContextUBO {
+public:
+    UniformBufferM4 ubo;
+
+public:
+    ContextUBO(int bindingPoint): ubo(1, GL_STATIC_DRAW) {
+        ubo.bindRange(0, 1 * sizeof(glm::mat4), bindingPoint);
+    };
+    
+    void updateScreenSize(int w, int h) {
+        ubo.updateWord(0, w);
+        ubo.updateWord(1, h);
+    }
+    void updateCameraExposure(float exposure) {
+        ubo.updateWord(2, exposure);
+    } 
 };
 
 #endif /* UBO_hpp */
