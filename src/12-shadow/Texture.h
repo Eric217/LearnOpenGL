@@ -18,6 +18,7 @@
 #define CUBEMAP_TEXTURE "texture_cubemap"
 #define DIR_LIGHT_TEXTURE "texture_dirLight"
 #define POINT_LIGHT_TEXTURE "texture_pointLight"
+#define BLOOM_TEXTURE "texture_bloom"
 
 class Texture {
 public:

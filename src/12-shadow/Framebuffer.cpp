@@ -8,6 +8,7 @@
 #include "Framebuffer.hpp"
 #include <iostream>
 
+// MARK: - normal buffer, like default
 void NormalFramebuffer::updateSize(int w, int h) {
     this->w = w;
     this->h = h;
@@ -16,7 +17,7 @@ void NormalFramebuffer::updateSize(int w, int h) {
     glBindTexture(GL_TEXTURE_2D, texId);
     GLenum fmt = usingHdr ? GL_RGB32F : GL_RGB;
     GLenum srcFmt = usingHdr ? GL_FLOAT : GL_UNSIGNED_BYTE;
-    glTexImage2D (GL_TEXTURE_2D, 0/*level*/, fmt/*internalformat*/, w, h, 0/*border*/, GL_RGB /*data format*/ , GL_FLOAT/*data type*/, 0/*data*/);
+    glTexImage2D (GL_TEXTURE_2D, 0/*level*/, fmt/*internalformat*/, w, h, 0/*border*/, GL_RGB /*data format*/ , srcFmt/*data type*/, 0/*data*/);
     
     glBindRenderbuffer(GL_RENDERBUFFER, rbo);
     glRenderbufferStorage(GL_FRAMEBUFFER, GL_DEPTH24_STENCIL8, w, h);
@@ -41,7 +42,7 @@ NormalFramebuffer::NormalFramebuffer(int w, int h, bool hdr) {
     glBindTexture(GL_TEXTURE_2D, texId);
     GLenum fmt = usingHdr ? GL_RGB32F : GL_RGB;
     GLenum srcFmt = usingHdr ? GL_FLOAT : GL_UNSIGNED_BYTE;
-    glTexImage2D (GL_TEXTURE_2D, 0/*level*/, fmt/*internalformat*/, w, h, 0/*border*/, GL_RGB /*data format*/ , GL_FLOAT/*data type*/, 0/*data*/);
+    glTexImage2D (GL_TEXTURE_2D, 0/*level*/, fmt/*internalformat*/, w, h, 0/*border*/, GL_RGB /*data format*/ , srcFmt/*data type*/, 0/*data*/);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -67,6 +68,40 @@ NormalFramebuffer::NormalFramebuffer(int w, int h, bool hdr) {
     if (checkResult != GL_FRAMEBUFFER_COMPLETE) {
         std::cout << "ERROR::FRAMEBUFFER::INCOMPLETE::" << checkResult << std::endl;
         assert(false);
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+MRTNormalBuffer::MRTNormalBuffer(int w, int h, int targetCount, bool hdr): NormalFramebuffer(w, h, hdr) {
+    texIds.push_back(texId);
+    if (targetCount <= 1) {
+        return;
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, Id);
+
+    for (int i = 1; i < targetCount; i++) {
+        texIds.push_back(0);
+        glGenTextures(1, &texIds[i]);
+        glBindTexture(GL_TEXTURE_2D, texIds[i]);
+        GLenum fmt = usingHdr ? GL_RGB32F : GL_RGB;
+        GLenum srcFmt = usingHdr ? GL_FLOAT : GL_UNSIGNED_BYTE;
+        glTexImage2D (GL_TEXTURE_2D, 0/*level*/, fmt/*internalformat*/, w, h, 0/*border*/, GL_RGB /*data format*/ , srcFmt/*data type*/, 0/*data*/);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, texIds[i], 0);
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void MRTNormalBuffer::updateSize(int w, int h) {
+    NormalFramebuffer::updateSize(w, h);
+    glBindFramebuffer(GL_FRAMEBUFFER, Id);
+
+    for (int i = 1; i < texIds.size(); i++) {
+        glBindTexture(GL_TEXTURE_2D, texIds[i]);
+        GLenum fmt = usingHdr ? GL_RGB32F : GL_RGB;
+        GLenum srcFmt = usingHdr ? GL_FLOAT : GL_UNSIGNED_BYTE;
+        glTexImage2D (GL_TEXTURE_2D, 0/*level*/, fmt/*internalformat*/, w, h, 0/*border*/, GL_RGB /*data format*/ , srcFmt/*data type*/, 0/*data*/);
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
@@ -115,7 +150,7 @@ void DepthFramebuffer::updateSize(int w, int h) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-// MARK: - for depth use only
+// MARK: - for cube depth use only
 
 CubeDepthFramebuffer::CubeDepthFramebuffer(int w, int h) {
     this->w = w;
@@ -160,4 +195,48 @@ void CubeDepthFramebuffer::updateSize(int w, int h) {
         glTexImage2D (GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+// MARK: - ping pong
+PingPongBuffer::PingPongBuffer(int w, int h, bool usingHdr) {
+    this->w = w;
+    this->h = h;
+    this->usingHdr = usingHdr;
+    
+    GLuint *buffers[2] = {&Id, &anotherId};
+    glGenFramebuffers(1, buffers[0]);
+    glGenFramebuffers(1, buffers[1]);
+    glGenTextures(2, texId);
+ 
+    for (int i = 0; i < 2; i++) {
+        auto bufferId = *buffers[i];
+        glBindFramebuffer(GL_FRAMEBUFFER, bufferId);
+        glBindTexture(GL_TEXTURE_2D, texId[i]);
+        
+        GLenum fmt = usingHdr ? GL_RGB32F : GL_RGB;
+        GLenum srcFmt = usingHdr ? GL_FLOAT : GL_UNSIGNED_BYTE;
+        glTexImage2D (GL_TEXTURE_2D, 0/*level*/, fmt/*internalformat*/, w, h, 0/*border*/, GL_RGB /*data format*/ , srcFmt/*data type*/, 0/*data*/);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texId[i], 0);
+        // check
+        auto checkResult = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+        if (checkResult != GL_FRAMEBUFFER_COMPLETE) {
+            std::cout << "ERROR::FRAMEBUFFER::INCOMPLETE::" << checkResult << std::endl;
+            assert(false);
+        }
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void PingPongBuffer::updateSize(int w, int h) {
+    for (int i = 0; i < 2; i++) {
+        glBindTexture(GL_TEXTURE_2D, texId[i]);
+        GLenum fmt = usingHdr ? GL_RGB32F : GL_RGB;
+        GLenum srcFmt = usingHdr ? GL_FLOAT : GL_UNSIGNED_BYTE;
+        glTexImage2D (GL_TEXTURE_2D, 0/*level*/, fmt/*internalformat*/,
+                      w, h, 0/*border*/, GL_RGB /*data format*/ ,
+                      srcFmt/*data type*/, 0/*data*/);
+    }
 }

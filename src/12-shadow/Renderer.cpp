@@ -35,14 +35,132 @@ constexpr int pointLightCount = 1;
 constexpr int pointLightMat4Count = 2;
 
 constexpr float pointShadowFarPlane = 20;
+constexpr int blurCount = 9;
+constexpr float ppBufferScale = 0.2;
 
 #define DepthFrameBufferSize 1024
 
-/// 预览用的
+/// 预览用的几个局部变量/宏
 static Model *depthMap;
+static bool USE_BLOOM_PREVIEW = 0;
+
 #define USE_DEPTH_PREVIEW 0
 #define USE_CUBE_PREVIEW 0
 #define USE_FRONT_CULLING 0
+#define USE_HDR_COMPARING 1
+
+void Renderer::render(Scene& scene, const Camera *camera) {
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    vBuffer.update(0, camera->getViewMatrix());
+    vBuffer.update(1, config::projectionMatrix(camera->fov));
+    context.updateCameraExposure(usingHDR * camera->exposure);
+    
+    auto dirLights = scene.getLights<Sun>();
+    // 除非没有平面物体产生阴影的需求 否则不要用这个！
+#if USE_FRONT_CULLING
+    glCullFace(GL_FRONT);
+#endif
+    for (int i = 0; i < dirShadowMaps.size(); i++) {
+        dirShadowMaps[i].activate();
+        glClear(GL_DEPTH_BUFFER_BIT);
+        render1(scene, 0, &dirLights[i]->Light::shader);
+        dirShadowMaps[i].deactivate();
+    }
+    auto pointLights = scene.getLights<Bulb>();
+    for (int i = 0; i < pointShadowMaps.size(); i++) {
+        pointShadowMaps[i].activate();
+        // 这里 dir map 不 clear 还能显示，但 point 会黑屏（全0）？
+        glClear(GL_DEPTH_BUFFER_BIT);
+
+        render1(scene, 0, &pointLights[i]->Light::shader);
+        pointShadowMaps[i].deactivate();
+    }
+#if USE_FRONT_CULLING
+    glCullFace(GL_BACK);
+#endif
+    
+    glViewport(0, 0, screenPixelW, screenPixelH);
+ 
+#if USE_DEPTH_PREVIEW || USE_CUBE_PREVIEW
+    glFrontFace(GL_CW);
+    depthMap->draw();
+    glFrontFace(GL_CCW);
+#else
+    render2(scene, camera);
+#endif
+}
+
+/// HDR & Bloom
+void Renderer::render2(Scene& scene, const Camera *camera, const Shader *customShader) {
+    getHdrBuffer().activate();
+    if (usingBloom) {
+        GLenum usingBuffers[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+        glDrawBuffers(2, usingBuffers);
+    }
+
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    // 把世界离屏渲染到 hdr buffer，同时多目标渲染一个光源图
+    render1(scene, camera, customShader);
+    getHdrBuffer().deactivate();
+    
+    glFrontFace(GL_CW);
+    if (!usingBloom) {
+        scene.getHdrQuad().draw();
+        glFrontFace(GL_CCW);
+        return;
+    }
+
+    // 现在把光源图进行高斯模糊，优化后的高斯算法需要使用 pingpong buffer 提高效率
+    auto &quad = scene.getHdrQuad();
+    auto baseTex = Texture(getHdrBuffer().getTextureAt(0), DIFFUSE_TEXTURE);
+    auto lightTex = Texture(getHdrBuffer().getTextureAt(1), DIFFUSE_TEXTURE);
+    auto &pFrameBuffer = *ppBuffer.get();
+    auto &shader = scene.gaussionFilter;
+    
+    // 第一步，把 光源图 渲染到 ping buffer
+    // 第二步，把 ping buffer 图 渲染到 pong buffer
+    // 需要循环进行第 1、2 步 N 次
+    quad.setTextures({lightTex});
+    shader.use();
+    // 为了性能，ppBuffer 是很小的 viewport
+    for (int i = 0; i < blurCount * 2; i++) {
+        pFrameBuffer.activate(i % 2);
+        glClear(GL_COLOR_BUFFER_BIT);
+        shader.setBool("usingPing", (i + 1) % 2);
+        quad.draw(shader);
+        quad.updateTexture(pFrameBuffer.asTexture());
+    }
+    pFrameBuffer.deactivate();
+    restoreDefaultViewport();
+    
+    // 已取出 pong 里的纹理图，diffuse 渲染到屏幕
+    if (USE_BLOOM_PREVIEW) {
+        // 只有一个模糊后的光源小图
+        quad.draw();
+        glFrontFace(GL_CCW);
+        return;
+    }
+    // 合成
+    quad.setTextures({
+        baseTex, // 基础图
+        Texture(pFrameBuffer.asTexture(), BLOOM_TEXTURE) // bloom
+    });
+    quad.draw();
+    
+    glFrontFace(GL_CCW);
+}
+
+/// 渲染 models
+void Renderer::render1(Scene& scene, const Camera *camera, const Shader *customShader) {
+    for (int i = 0; i < scene.models.size(); i++) {
+        if (!customShader) {
+            scene.modelAt(i).draw();
+        } else {
+            scene.modelAt(i).draw(*customShader);
+        }
+    }
+}
 
 void Renderer::setup(const Scene &scene) {
     Texture t1, t2;
@@ -138,86 +256,14 @@ void Renderer::setup(const Scene &scene) {
 #endif
 }
 
-void Renderer::render(Scene& scene, const Camera *camera) {
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    vBuffer.update(0, camera->getViewMatrix());
-    vBuffer.update(1, config::projectionMatrix(camera->fov));
-    context.updateCameraExposure(usingHDR * camera->exposure);
-    
-    auto dirLights = scene.getLights<Sun>();
-    // 除非没有平面物体产生阴影的需求 否则不要用这个！
-#if USE_FRONT_CULLING
-    glCullFace(GL_FRONT);
-#endif
-    for (int i = 0; i < dirShadowMaps.size(); i++) {
-        dirShadowMaps[i].activate();
-        glClear(GL_DEPTH_BUFFER_BIT);
-        render1(scene, 0, &dirLights[i]->Light::shader);
-        dirShadowMaps[i].deactivate();
-    }
-    auto pointLights = scene.getLights<Bulb>();
-    for (int i = 0; i < pointShadowMaps.size(); i++) {
-        pointShadowMaps[i].activate();
-        // 这里 dir map 不 clear 还能显示，但 point 会黑屏（全0）？
-        glClear(GL_DEPTH_BUFFER_BIT);
-
-        render1(scene, 0, &pointLights[i]->Light::shader);
-        pointShadowMaps[i].deactivate();
-    }
-#if USE_FRONT_CULLING
-    glCullFace(GL_BACK);
-#endif
-    
-    glViewport(0, 0, screenPixelW, screenPixelH);
- 
-#if USE_DEPTH_PREVIEW || USE_CUBE_PREVIEW
-    glFrontFace(GL_CW);
-    depthMap->draw();
-    glFrontFace(GL_CCW);
-#else
-    render2(scene, camera);
-#endif
-}
-
-/// HDR pass
-void Renderer::render2(Scene& scene, const Camera *camera, const Shader *customShader) {
-    if (!config::usingHDR) {
-        render1(scene, camera, customShader);
-        return;
-    }
-    getHdrBuffer().activate();
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    render1(scene, camera, customShader);
-    getHdrBuffer().deactivate();
-    
-    glFrontFace(GL_CW);
-    scene.getHdrQuad().draw();
-    glFrontFace(GL_CCW);
-}
-
-/// 渲染 models
-void Renderer::render1(Scene& scene, const Camera *camera, const Shader *customShader) {
-    for (int i = 0; i < scene.models.size(); i++) {
-        if (!customShader) {
-            scene.modelAt(i).draw();
-        } else {
-            scene.modelAt(i).draw(*customShader);
-        }
-    }
-}
-
 void Renderer::updateScreenSize(int w, int h) {
     glViewport(0, 0, w, h);
     
-    for (int i = 0; i < dirShadowMaps.size(); i++) {
-        dirShadowMaps[i].updateSize(w, h);
-    }
-    for (int i = 0; i < pointShadowMaps.size(); i++) {
-        pointShadowMaps[i].updateSize(w, h);
-    }
     if (hdrBuffer) {
         hdrBuffer.get()->updateSize(w, h);
+    }
+    if (ppBuffer) {
+        ppBuffer.get()->updateSize(w * ppBufferScale, h * ppBufferScale);
     }
     context.updateScreenSize(w, h);
 }
@@ -254,24 +300,27 @@ Renderer::Renderer(const Scene &scene):
     vBuffer.bindRange(0, 2 * sizeof(mat4), BINDING_POINT_VP);
     dirLightBuffer.bindRange(0, dirLightMat4Count * sizeof(mat4), BINDING_POINT_DIR_LIGHTS);
     pointLightBuffer.bindRange(0, pointLightMat4Count * sizeof(mat4), BINDING_POINT_POINT_LIGHTS);
-     
-    if (usingHDR) {
+    {
         auto &quad = scene.getHdrQuad();
-        quad.setTextures({
-            Texture(getHdrBuffer().asTexture(), DIFFUSE_TEXTURE)});
+        auto texId = getHdrBuffer().asTexture();
+        quad.setTextures({Texture(texId, DIFFUSE_TEXTURE)});
         quad.shader.use();
         quad.bindUniformBlock("Context", BINDING_POINT_CONTEXT);
+        quad.shader.setBool("hdrMask", USE_HDR_COMPARING);
+    }
+    if (usingBloom) {
+        ppBuffer.reset(new PingPongBuffer(screenPixelW * ppBufferScale, screenPixelW * ppBufferScale, usingHDR));
     }
     context.updateScreenSize(screenPixelW, screenPixelH);
     
     setup(scene);
 }
 
-const NormalFramebuffer& Renderer::getHdrBuffer() {
+const MRTNormalBuffer& Renderer::getHdrBuffer() {
     if (hdrBuffer) {
         return *hdrBuffer;
     }
-    hdrBuffer = std::shared_ptr<NormalFramebuffer>(
-        new NormalFramebuffer(config::screenPixelW, config::screenPixelH, true));
+    hdrBuffer = std::shared_ptr<MRTNormalBuffer>(
+        new MRTNormalBuffer(config::screenPixelW, config::screenPixelH, 2, usingHDR));
     return *hdrBuffer;
 }

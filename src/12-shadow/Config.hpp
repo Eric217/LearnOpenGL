@@ -27,6 +27,7 @@ extern float cameraFarPlane;
 extern bool usingHDR;
 extern bool usingSRGB;
 extern bool using_GL_SRGB;
+extern bool usingBloom;
 
 Scene loadScene();
 
@@ -35,7 +36,7 @@ Camera* loadCamera();
 
 glm::mat4 projectionMatrix(float fovDegree);
 glm::mat4 perspective(float fovDegree, float whRatio, float near, float far);
-
+void restoreDefaultViewport();
 
 }
  

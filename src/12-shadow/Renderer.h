@@ -34,7 +34,8 @@ class Renderer {
     std::vector<DepthFramebuffer> dirShadowMaps;
     std::vector<CubeDepthFramebuffer> pointShadowMaps;
 
-    std::shared_ptr<NormalFramebuffer> hdrBuffer;
+    std::shared_ptr<MRTNormalBuffer> hdrBuffer;
+    std::shared_ptr<PingPongBuffer> ppBuffer;
     
 public:
     Renderer(const Scene &scene);
@@ -47,7 +48,7 @@ private:
     void setup(const Scene &scene);
     void render1(Scene& scene, const Camera *camera, const Shader *customShader = 0);
     void render2(Scene& scene, const Camera *camera, const Shader *customShader = 0);
-    const NormalFramebuffer& getHdrBuffer();
+    const MRTNormalBuffer& getHdrBuffer();
 };
 
 

@@ -5,7 +5,14 @@ struct Material {
     sampler2D texture_diffuse0;
 };
 
+struct Bloom {
+    bool use_texture_bloom0;
+    sampler2D texture_bloom0;
+};
+
+uniform Bloom lights;
 uniform Material material;
+uniform bool hdrMask; // true 时开启 HDR 开关对比
 
 layout(std140) uniform Context {
     int context_screen_w;
@@ -34,6 +41,11 @@ void main() {
                      gl_FragCoord.y / context_screen_h);
     vec4 texel = texture(material.texture_diffuse0, coor);
 
-    color.xyz = hdr_to_ldr(texel.xyz, coor.x < 0.5);
+    if (lights.use_texture_bloom0) {
+        // 需要设置 threshold，但是我没想出来好的办法？？？
+        // 现在暖光灯就已经颜色失真了。。
+        texel += texture(lights.texture_bloom0, coor);
+    }
+    color.xyz = hdr_to_ldr(texel.xyz, coor.x < 0.5 || !hdrMask);
 }
 

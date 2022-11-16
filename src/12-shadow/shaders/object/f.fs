@@ -1,4 +1,6 @@
 #version 330 core
+layout(location = 0) out vec4 color;
+layout(location = 1) out vec4 color1;
 
 struct Material {
     bool use_texture_diffuse0;
@@ -92,9 +94,6 @@ in Payload {
     vec3 normal; // view space coor
 } frag;
  
-
-out vec4 color;
-
 
 vec3 calcPointLight(PointLight light);
 // vec3 calcSpotLight(SpotLight light);

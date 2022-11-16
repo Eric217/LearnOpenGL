@@ -17,7 +17,8 @@ class Scene {
     std::vector<std::shared_ptr<Light>> lights;
     std::shared_ptr<Model> skybox;
     std::shared_ptr<Model> hdrQuad;
-    
+    Shader gaussionFilter;
+
 public:
     void addModel(const std::string& path, const glm::mat4 &trans, const Shader &shader, GLenum wrap = GL_REPEAT) {
         std::shared_ptr<Model> m(new Model(path, shader, trans, wrap));
@@ -50,7 +51,8 @@ public:
     ModelArray allModels() const;
     Model& getHdrQuad() const { return *hdrQuad.get(); }
     void setHdrQuad(Model *model) { hdrQuad.reset(model); }
-    
+    void setBloomShader(const Shader &shader) { gaussionFilter = shader; }
+
     template<class T>
     const std::vector<T*> getLights() const {
         std::vector<T*> vec;

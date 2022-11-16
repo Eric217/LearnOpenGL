@@ -1,5 +1,5 @@
-- shadow mapping
+- Shadow mapping
     - directional light
     - point light
-    - spot light
-
+- HDR
+- Bloom

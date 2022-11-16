@@ -29,6 +29,7 @@ float config::cameraFarPlane = 200;
 bool config::usingHDR = true;
 bool config::usingSRGB = true;
 bool config::using_GL_SRGB = true;
+bool config::usingBloom = true;
 
 Scene config::loadScene() {
     const std::string cubeDir = MODEL_DIR"/cube/cube.obj";
@@ -108,14 +109,17 @@ Scene config::loadScene() {
         scene.addModel(ptr);
 #endif
     }
-    if (usingHDR) {
+    {
         auto shader = Shader(SHADER_DIR"/hdr/v.vs", SHADER_DIR"/hdr/f.fs");
         auto model = new Model(
             MODEL_DIR"/../../08-framebuffer/models/quadr/quadr.obj",
             shader, id4, GL_CLAMP_TO_EDGE, false);
         scene.setHdrQuad(model);
     }
-    
+    if (usingBloom) {
+        scene.setBloomShader(Shader(SHADER_DIR"/bloom/v.vs",
+                                    SHADER_DIR"/bloom/f.fs"));
+    }
     return scene;
 }
 
@@ -134,6 +138,10 @@ Camera* config::loadCamera() {
     camera->upVec = vec3(0.f, 1.f, 0.f);
     camera->fov = 38;
     return camera;
+}
+
+void config:: restoreDefaultViewport() {
+    glViewport(0, 0, screenPixelW, screenPixelH);
 }
 
 #if NDEBUG

@@ -102,7 +102,7 @@ static std::string useLightPrefix = "lights.use_";
 void Mesh::applyTextures(const Shader &shader) const {
     // 每个纹理绑到一个槽位上，按照类型绑到不同的 uniform sampler 上
     auto diffNr = 0, specNr = 0, cubeNr = 0, cube2dNr = 0,
-    dirLightNr = 0, pointLightNr = 0;
+    dirLightNr = 0, pointLightNr = 0, bloomNr = 0;
     
     for (auto i = 0; i < textures.size(); i++) {
         textures[i].use(i, wrap);
@@ -130,6 +130,10 @@ void Mesh::applyTextures(const Shader &shader) const {
             auto s = textures[i].type + std::to_string(pointLightNr++);
             shader.setInt(lightPrefix + s, i);
             shader.setBool(useLightPrefix + s, textures[i].shouldUse);
+        } else if (textures[i].type == BLOOM_TEXTURE) {
+            auto s = textures[i].type + std::to_string(bloomNr++);
+            shader.setInt(lightPrefix + s, i);
+            shader.setBool(useLightPrefix + s, textures[i].shouldUse);
         } else {
             assert(false); // 未处理!
         }
@@ -152,6 +156,7 @@ static std::map<std::string, int> texture_order = {
     {CUBEMAP_TEXTURE, 3},
     {DIR_LIGHT_TEXTURE, 4},
     {POINT_LIGHT_TEXTURE, 5},
+    {BLOOM_TEXTURE, 6},
 };
 
 void Mesh::sortTextures() {
