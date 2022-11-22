@@ -29,7 +29,7 @@ struct PointLight {
     vec3 diffuse;
     vec3 specular;
     
-    vec3 attenuation;
+    vec4 attenuation; // k0 k1 k2 radius
     
     vec3 slot0;
     vec3 slot1;
@@ -52,7 +52,7 @@ struct SpotLight {
     float k2;
 };
 
-#define NR_POINT_LIGHTS 1
+#define NR_POINT_LIGHTS 2
 #define NR_DIR_LIGHTS 1
 #define NR_SPOT_LIGHTS 0
 
@@ -72,6 +72,9 @@ struct LightMap {
 
     samplerCube texture_pointLight0;
     bool use_texture_pointLight0;
+
+    samplerCube texture_pointLight1;
+    bool use_texture_pointLight1;
 };
 
 uniform LightMap lights;
@@ -93,22 +96,32 @@ in Payload {
 } frag;
  
 
-vec3 calcPointLight(PointLight light);
+vec3 calcPointLight(int idx, PointLight light);
 // vec3 calcSpotLight(SpotLight light);
 vec3 calcDirectionalLight(DirLight light);
 
 void main() {
+    color1 = vec4(0);
+    
     vec3 result = vec3(0);
     for (int i = 0; i < NR_DIR_LIGHTS; i++) {
         result += calcDirectionalLight(dirLights[i]);
     }
     for (int i = 0; i < NR_POINT_LIGHTS; i++) {
-        result += calcPointLight(pointLights[i]);
+        result += calcPointLight(i, pointLights[i]);
     }
     // for (int i = 0; i < NR_SPOT_LIGHTS; i++) {
     //     result += calcSpotLight(spotLights[i]);
     // }
     color = vec4(result, 1);
+}
+
+vec3 sampleSpec0(vec2 coor) {
+    if (material.use_texture_specular0) {
+        return texture(material.texture_specular0, coor).xyz;
+    } else {
+        return vec3(0);
+    }
 }
 
 vec3 sampleOffsetDirections[20] = vec3[]
@@ -121,11 +134,11 @@ vec3 sampleOffsetDirections[20] = vec3[]
 );
 
 /// 完全在阴影中返回 1
-float pointLightShadow(vec3 toLightN) {
+float pointLightShadow(int idx, vec3 toLightN) {
     if (!lights.use_texture_pointLight0) {
         return 0;
     }
-    vec3 pos_light = frag.pos_world.xyz - pointLights[0].position;
+    vec3 pos_light = frag.pos_world.xyz - pointLights[idx].position;
     float curDistance = length(pos_light);
     if (curDistance > farPlane) {
         return 0;
@@ -153,14 +166,19 @@ float pointLightShadow(vec3 toLightN) {
     
     for (int i = 0; i < 20; i++) {
         vec3 dir = posN + sampleOffsetDirections[i] * offsetFixing;
-        float depth = texture(lights.texture_pointLight0, dir).r;
+        float depth = 0;
+        if (idx == 0) {
+            depth = texture(lights.texture_pointLight0, dir).r;
+        } else {
+            depth = texture(lights.texture_pointLight1, dir).r;
+        }
         total += float(curDistance > depth * farPlane + bias);
     }
     return total / 20;
 }
 
 /// 其他参数：Payload frag, Material material, MVP
-vec3 calcPointLight(PointLight light) {
+vec3 calcPointLight(int idx, PointLight light) {
     vec3 tex_color = vec3(0);
     if (material.use_texture_diffuse0) {
         tex_color = texture(material.texture_diffuse0, frag.tex_coor).xyz;
@@ -176,30 +194,27 @@ vec3 calcPointLight(PointLight light) {
     float k0 = light.attenuation.x;
     float k1 = light.attenuation.y;
     float k2 = light.attenuation.z;
-   
-    float attenuation = 1.0
-        / (k0 + k1 * distance + k2 * distance * distance);
+    float attenuation = 1.0 / (k0 + k1 * distance + k2 * distance * distance);
 
-    vec3 amb = light.ambient * tex_color * 0.008;
+    vec3 amb = light.ambient * tex_color * 0.0016;
     vec3 diff = cos * light.diffuse * tex_color;
     // 高光
     vec3 halfV = normalize((toLightN) + toEye);
     
-    tex_color = vec3(0);
-    if (material.use_texture_specular0) {
-        tex_color = texture(material.texture_specular0, frag.tex_coor).xyz;
-    }
+    tex_color = sampleSpec0(frag.tex_coor);
+
     // 使用半程而不是反射（Blinn 区别）
     float cos2 = dot(halfV, frag.normal);
     vec3 spec;
     if (cos > 0 && cos2 > 0 && dot(toEye, frag.normal) > 0) {
-        spec = pow(cos2, 150) * light.specular * tex_color;
+        spec = pow(cos2, 15) * light.specular * tex_color;
     } else {
         spec = vec3(0);
     }
-    float pcf = 1 - pointLightShadow(toLightN);
-
-    return (amb + pcf * (diff + spec)) * attenuation;
+    float pcf = (1 - pointLightShadow(idx, toLightN)) * attenuation;
+    amb *= attenuation;
+    color1 += vec4(pcf * spec, 0);
+    return pcf * diff + pcf * spec + amb;
 }
  
 /// 完全在阴影中返回 1
@@ -251,23 +266,22 @@ vec3 calcDirectionalLight(DirLight light) {
 
     float cos = max(0, dot(toLightN, frag.normal));
 
-    vec3 amb = light.ambient * tex_color * 0.015;
+    vec3 amb = light.ambient * tex_color * 0.003;
     vec3 diff = cos * light.diffuse * tex_color;
     // 高光
     vec3 halfV = normalize((toLightN) + toEye);
-    
-    tex_color = vec3(0);
-    if (material.use_texture_specular0) {
-        tex_color = texture(material.texture_specular0, frag.tex_coor).xyz;
-    }
+
+    tex_color = sampleSpec0(frag.tex_coor);
+     
     // 使用半程而不是反射（Blinn 区别）
     float cos2 = dot(halfV, frag.normal);
     vec3 spec;
     if (cos > 0 && cos2 > 0 && dot(toEye, frag.normal) > 0) {
-        spec = pow(cos2, 150) * light.specular * tex_color;
+        spec = pow(cos2, 15) * light.specular * tex_color;
     } else {
         spec = vec3(0);
     }
     float pcf = 1 - dirLightShadow(light.trans, toLightN);
+    color1 += vec4(pcf * spec, 0);
     return amb + pcf * (diff + spec);
 }

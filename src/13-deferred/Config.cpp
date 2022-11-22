@@ -29,32 +29,49 @@ float config::cameraFarPlane = 200;
 bool config::usingHDR = true;
 bool config::usingSRGB = true;
 bool config::using_GL_SRGB = true;
-bool config::usingBloom = true;
+bool config::usingBloom = 1;
+
+#define SHOW_LIGHT_VOLUME 0
 
 Scene config::loadScene() {
-    const std::string cubeDir = GLOBAL_MODEL_DIR"/container/cube.obj";
+    const std::string cubeDir = GLOBAL_MODEL_DIR"/cube/cube.obj";
+    const std::string containerDir = GLOBAL_MODEL_DIR"/container/cube.obj";
+    const std::string nanoDir = GLOBAL_MODEL_DIR"/nanosuit/nanosuit.obj";
+    const std::string quadDir = GLOBAL_MODEL_DIR"/quad/quad.obj";
     const std::string floorDir = GLOBAL_MODEL_DIR"/floor/floor.obj";
+    const std::string ballDir = GLOBAL_MODEL_DIR"/ball/ball.obj";
+
     const std::string shaderDir = SHADER_DIR;
 
     Scene scene;
     const mat4 id4(1.f);
-  
+
     // cubes
     {
         auto shader = Shader(shaderDir + "/object/v.vs", shaderDir + "/object/f.fs");
         // 在屏幕上分别是 3, 1, 2
-        vec3 positions[3] = { {2, -0.1501, -4.6},    {-3, 1.3001, 3}, {0, 0.1003, 0} };
-        vec3 scales[3] =    { {1.03, 0.85, 1.03}, {1, 2.3, 1},{1.1, 1.1, 1.1}};
-        for (int i = 0; i<3; i++) {
-            scene.addModel(cubeDir,
-                scale(translate(id4, positions[i]), scales[i]),
-                shader);
+        vec3 positions[3] = { {2, -0.1501, -4.6},   {-3, 1.3001, 3},{0,   0.1003, 0  }};
+        vec3 scales[3] =    { {1.03, 0.85, 1.03},   {1,  2.3, 1},   {1.2, 1.1,    1.2}};
+        for (int i = 0; i < 3; i++) {
+            scene.addModel(containerDir,
+                           scale(translate(id4, positions[i]), scales[i]),
+                           shader);
         }
     }
     // floor
     {
         auto shader = Shader(shaderDir + "/object/v.vs", shaderDir + "/object/f.fs");
-        auto m = new Model(floorDir, shader, scale(id4, vec3(1.15, 1, 1.15)));
+        float scaleF = 1.6;
+        auto m = new Model(floorDir, shader, scale(id4, vec3(scaleF, 1, scaleF)));
+        scene.addModel(m);
+    }
+    // nano
+    {
+        auto shader = Shader(SHADER_DIR "/object/v.vs", SHADER_DIR "/object/f.fs", false);
+        auto matT = translate(id4, vec3(-8.1,-1.18,-4))
+                    * rotate(id4, radians(180.f), vec3(0,1,0))
+                    * scale(id4, vec3(0.46));
+        auto m = new Model(nanoDir, shader, matT);
         scene.addModel(m);
     }
     // lights
@@ -67,12 +84,11 @@ Scene config::loadScene() {
         auto shadowShader = Shader(shaderDir + "/shadow/dir.vs", shaderDir + "/shadow/dir.fs", false);
 
         Sun *sunPtr = new Sun(cubeDir, lightShader, mat);
-        sunPtr->setTextures({});
         
         auto &light = *sunPtr;
         light.name = "dirLights";
         light.direction = dir;
-        light.ambient = vec3(255, 198, 107)/255.f * 0.66f;
+        light.ambient = vec3(255, 198, 107)/255.f * 0.08f;
         light.diffuse = light.ambient;
         light.specular = light.ambient;
         light.Light::shader = shadowShader;
@@ -81,8 +97,12 @@ Scene config::loadScene() {
         scene.addLight(ptr);
         scene.addModel(ptr);
     }
-    {
-        auto mat = translate(id4, vec3(0.59f, 1.8f, -2.45f));
+    vec3 bulbTrans[2] = {
+        vec3(0.59f, 1.8f, -2.45f),
+        vec3(-8.2f, 5.83f, -5.3f),
+    };
+    for (int i = 0; i < 2; i++) {
+        auto mat = translate(id4, bulbTrans[i]);
         mat *= scale(id4, vec3(0.1f, 0.1f, 0.1f));
         auto lightShader = Shader(shaderDir + "/light/v.vs", shaderDir + "/light/f.fs", false);
         auto shadowShader = Shader(shaderDir + "/shadow/p.vs", shaderDir + "/shadow/p.fs", shaderDir + "/shadow/p.gs", false);
@@ -95,22 +115,28 @@ Scene config::loadScene() {
         bulb.Light:: shader = shadowShader;
         
         bulb.name = "pointLights";
-        bulb.ambient = vec3(10);
-        bulb.diffuse = vec3(10);
-        bulb.specular = vec3(10);
+        bulb.ambient = vec3(i == 0 ? 18 : 21);
+        bulb.diffuse = bulb.ambient;
+        bulb.specular = bulb.ambient;
         bulb.k0 = 1;
-        bulb.k1 = 0.04;
-        bulb.k2 = 0.02;
-
+        bulb.k1 = 0.09;
+        bulb.k2 = i == 0 ? 2 : 2.5;
+        bulb.r = bulb.lightVolumeRadius();
+        
         std::shared_ptr<Bulb> ptr(bulbPtr);
         scene.addLight(ptr);
         scene.addModel(ptr);
+        
+#if SHOW_LIGHT_VOLUME
+        auto shader = Shader(SHADER_DIR"/volume/v.vs", SHADER_DIR"/volume/f.fs");
+        // 110 是模型的半径
+        auto t = translate(id4, bulb.position) * scale(id4, vec3(bulb.r / 110));
+        scene.addModel(ballDir, t, shader);
+#endif
     }
     {
         auto shader = Shader(SHADER_DIR"/hdr/v.vs", SHADER_DIR"/hdr/f.fs");
-        auto model = new Model(
-            MODEL_DIR"/../../08-framebuffer/models/quadr/quadr.obj",
-            shader, id4, GL_CLAMP_TO_EDGE, false);
+        auto model = new Model(quadDir, shader, id4, GL_CLAMP_TO_EDGE, false);
         scene.setHdrQuad(model);
     }
     if (usingBloom) {

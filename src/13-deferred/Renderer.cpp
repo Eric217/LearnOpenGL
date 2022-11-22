@@ -25,16 +25,17 @@ using namespace config;
 #define BINDING_POINT_VP 0
 #define BINDING_POINT_DIR_LIGHTS 1
 #define BINDING_POINT_POINT_LIGHTS 2
-#define BINDING_POINT_CUBE_MAT 3
-#define BINDING_POINT_CONTEXT 4
+#define BINDING_POINT_CUBE_MAT 4
+#define BINDING_POINT_CONTEXT 3
+#define BINDING_POINT_CUBE_MAT2 5
 
 constexpr int dirLightCount = 1;
 constexpr int dirLightMat4Count = 2;
 
-constexpr int pointLightCount = 1;
+constexpr int pointLightCount = 2;
 constexpr int pointLightMat4Count = 2;
 
-constexpr float pointShadowFarPlane = 20;
+constexpr float pointShadowFarPlane = 27;
 constexpr int blurCount = 9;
 constexpr float ppBufferScale = 0.2;
 
@@ -42,20 +43,22 @@ constexpr float ppBufferScale = 0.2;
 
 /// 预览用的几个局部变量/宏
 static Model *depthMap;
-static bool USE_BLOOM_PREVIEW = 0;
 
+#define USE_BLOOM_PREVIEW 0
 #define USE_DEPTH_PREVIEW 0
-#define USE_CUBE_PREVIEW 0
+#define USE_CUBE_PREVIEW 0 // 预览第一个点光源的阴影图
+#define USE_CUBE_PREVIEW_1 0 // 预览第二个点光源的阴影图
 #define USE_FRONT_CULLING 0
-#define USE_HDR_COMPARING 1
+#define USE_HDR_COMPARING 0
 
 void Renderer::render(Scene& scene, const Camera *camera) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
+    // 更新一些基础全局变量
     vBuffer.update(0, camera->getViewMatrix());
     vBuffer.update(1, config::projectionMatrix(camera->fov));
-    context.updateCameraExposure(usingHDR * camera->exposure);
+    context.updateCameraExposure(bool(usingHDR) * camera->exposure);
     
+    // 光源拍照 用于计算阴影
     auto dirLights = scene.getLights<Sun>();
     // 除非没有平面物体产生阴影的需求 否则不要用这个！
 #if USE_FRONT_CULLING
@@ -72,49 +75,54 @@ void Renderer::render(Scene& scene, const Camera *camera) {
         pointShadowMaps[i].activate();
         // 这里 dir map 不 clear 还能显示，但 point 会黑屏（全0）？
         glClear(GL_DEPTH_BUFFER_BIT);
-
         render1(scene, 0, &pointLights[i]->Light::shader);
         pointShadowMaps[i].deactivate();
     }
 #if USE_FRONT_CULLING
     glCullFace(GL_BACK);
 #endif
-    
-    glViewport(0, 0, screenPixelW, screenPixelH);
+    restoreDefaultViewport();
  
-#if USE_DEPTH_PREVIEW || USE_CUBE_PREVIEW
+    // 阴影预览
+#if USE_DEPTH_PREVIEW || USE_CUBE_PREVIEW || USE_CUBE_PREVIEW_1
     glFrontFace(GL_CW);
     depthMap->draw();
     glFrontFace(GL_CCW);
 #else
+    // 渲染世界
+    // 如果不开 HDR、Bloom、Deferred，直接 render1 渲染到屏幕即可
     render2(scene, camera);
 #endif
 }
 
+/// 延迟管线渲染
+void Renderer::render3(Scene& scene, const Camera *camera, const Shader *customShader) {
+    
+}
+
 /// HDR & Bloom
 void Renderer::render2(Scene& scene, const Camera *camera, const Shader *customShader) {
+    
+    // 把世界离屏渲染到 hdr buffer，同时多目标渲染一个光源图
     getHdrBuffer().activate();
     if (usingBloom) {
         GLenum usingBuffers[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
         glDrawBuffers(2, usingBuffers);
     }
-
+    glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    // 把世界离屏渲染到 hdr buffer，同时多目标渲染一个光源图
     render1(scene, camera, customShader);
     getHdrBuffer().deactivate();
-    
-    glFrontFace(GL_CW);
+     
     if (!usingBloom) {
         scene.getHdrQuad().draw();
-        glFrontFace(GL_CCW);
         return;
     }
 
     // 现在把光源图进行高斯模糊，优化后的高斯算法需要使用 pingpong buffer 提高效率
     auto &quad = scene.getHdrQuad();
-    auto baseTex = Texture(getHdrBuffer().getTextureAt(0), DIFFUSE_TEXTURE);
-    auto lightTex = Texture(getHdrBuffer().getTextureAt(1), DIFFUSE_TEXTURE);
+    auto baseTex = Texture(getHdrBuffer().getTextureAt(0), diffuse);
+    auto lightTex = Texture(getHdrBuffer().getTextureAt(1), diffuse);
     auto &pFrameBuffer = *ppBuffer.get();
     auto &shader = scene.gaussionFilter;
     
@@ -134,21 +142,17 @@ void Renderer::render2(Scene& scene, const Camera *camera, const Shader *customS
     pFrameBuffer.deactivate();
     restoreDefaultViewport();
     
+#if USE_BLOOM_PREVIEW
     // 已取出 pong 里的纹理图，diffuse 渲染到屏幕
-    if (USE_BLOOM_PREVIEW) {
-        // 只有一个模糊后的光源小图
-        quad.draw();
-        glFrontFace(GL_CCW);
-        return;
-    }
+    // 只有一个模糊后的光源小图
+#else
     // 合成
     quad.setTextures({
         baseTex, // 基础图
-        Texture(pFrameBuffer.asTexture(), BLOOM_TEXTURE) // bloom
+        Texture(pFrameBuffer.asTexture(), bloom) // bloom
     });
+#endif
     quad.draw();
-    
-    glFrontFace(GL_CCW);
 }
 
 /// 渲染 models
@@ -181,13 +185,13 @@ void Renderer::setup(const Scene &scene) {
         auto dir = normalize(light.direction);
         auto pos = -30.f * dir;
         auto v = lookAt(pos, pos + dir, vec3(0, 1, 0));
-        float frustum = 15.f; // 视锥外面都视为无阴影
+        float frustum = 21.f; // 视锥外面都视为无阴影
         auto pv = ortho(-frustum, frustum, -frustum, frustum, 0.1f, config::cameraFarPlane) * v;
         light.Light::shader.setMat4("vpMatrix", pv);
         dirLightBuffer.update(1 + 2 * i, pv);
         
         auto &models = scene.models;
-        Texture t(b.asTexture(), DIR_LIGHT_TEXTURE);
+        Texture t(b.asTexture(), dirlight);
         auto vec = {t};
         t1 = t;
         for (auto &model: models) {
@@ -204,17 +208,28 @@ void Renderer::setup(const Scene &scene) {
         light.shader.use();
         light.shader.setFloat("farPlane", pointShadowFarPlane);
         light.shader.setVec4("cameraPos", vec4(light.position, 1));
-        light.shader.bindUniformBlock("Transforms", BINDING_POINT_CUBE_MAT);
-        cubeMatrices.bindRange(0, 6 * sizeof(mat4), BINDING_POINT_CUBE_MAT);
-
+        light.shader.bindUniformBlock("Transforms", BINDING_POINT_CUBE_MAT + i);
+        UniformBufferM4 cubeM(6, GL_STATIC_DRAW);
+        cubeM.bindRange(0, 6 * sizeof(mat4), BINDING_POINT_CUBE_MAT + i);
+        cubeMatrices.push_back(cubeM);
+         
         model.shader.use();
-        model.shader.setVec3("lightColor", light.diffuse);
+        model.shader.setVec3("lightColor", light.ambient);
         
         auto b = CubeDepthFramebuffer(DepthFrameBufferSize, DepthFrameBufferSize);
         pointShadowMaps.push_back(b);
         
-        Texture t(b.asTexture(), POINT_LIGHT_TEXTURE);
-        t2 = t;
+        Texture t(b.asTexture(), pointlight);
+#if USE_CUBE_PREVIEW_1
+        if (i == 1) {
+            t2 = t;
+        }
+#endif
+#if USE_CUBE_PREVIEW
+        if (i == 0) {
+            t2 = t;
+        }
+#endif
         auto vec = {t};
         auto &models = scene.models;
         for (auto &model: models) {
@@ -225,18 +240,18 @@ void Renderer::setup(const Scene &scene) {
         pointLightBuffer.update(2 + 4 * pointLightMat4Count * i, light.diffuse);
         pointLightBuffer.update(3 + 4 * pointLightMat4Count * i, light.specular);
         pointLightBuffer.update(4 + 4 * pointLightMat4Count * i,
-                                vec3(light.k0, light.k1, light.k2));
+                                vec4(light.k0, light.k1, light.k2, light.r));
  
         mat4 proj = config::perspective(90, 1, 0.5, pointShadowFarPlane);
         // 关于这里 lookat 的 up vec，因为是给 cubemap 用的，
         // cubemap 会假设纹理是从外面看的样子，他内部会有 1-x 的操作，
         // 所以我们绘制一个面的时候要反着画!
-        cubeMatrices.update(0, proj * lookAt(light.position, light.position + vec3(1,0,0), vec3(0,-1,0)));
-        cubeMatrices.update(1, proj * lookAt(light.position, light.position + vec3(-1,0,0), vec3(0,-1,0)));
-        cubeMatrices.update(2, proj * lookAt(light.position, light.position + vec3(0,1,0), vec3(0,0,1)));
-        cubeMatrices.update(3, proj * lookAt(light.position, light.position + vec3(0,-1,0), vec3(0,0,-1)));
-        cubeMatrices.update(4, proj * lookAt(light.position, light.position + vec3(0,0,1), vec3(0,-1,0)));
-        cubeMatrices.update(5, proj * lookAt(light.position, light.position + vec3(0,0,-1), vec3(0,-1,0)));
+        cubeM.update(0, proj * lookAt(light.position, light.position + vec3(1,0,0), vec3(0,-1,0)));
+        cubeM.update(1, proj * lookAt(light.position, light.position + vec3(-1,0,0), vec3(0,-1,0)));
+        cubeM.update(2, proj * lookAt(light.position, light.position + vec3(0,1,0), vec3(0,0,1)));
+        cubeM.update(3, proj * lookAt(light.position, light.position + vec3(0,-1,0), vec3(0,0,-1)));
+        cubeM.update(4, proj * lookAt(light.position, light.position + vec3(0,0,1), vec3(0,-1,0)));
+        cubeM.update(5, proj * lookAt(light.position, light.position + vec3(0,0,-1), vec3(0,-1,0)));
     }
     
 #if USE_DEPTH_PREVIEW
@@ -245,7 +260,7 @@ void Renderer::setup(const Scene &scene) {
     depthMap = new Model(previewModelDir, previewShader, mat4(1), GL_CLAMP_TO_EDGE, false);
     t2.shouldUse = false;
     depthMap->setTextures({t1});
-#elif USE_CUBE_PREVIEW
+#elif USE_CUBE_PREVIEW || USE_CUBE_PREVIEW_1
     auto previewShader = Shader(SHADER_DIR"/preview/point.vs", SHADER_DIR"/preview/point.fs");
     std::string previewModelDir = MODEL_DIR"/../../09-cubemap/models/skybox/skybox.obj";
     depthMap = new Model(previewModelDir, previewShader, mat4(1), GL_CLAMP_TO_EDGE, false);
@@ -272,15 +287,14 @@ Renderer::Renderer(const Scene &scene):
     vBuffer(2, GL_STREAM_DRAW),
     context(BINDING_POINT_CONTEXT),
     dirLightBuffer(dirLightMat4Count * dirLightCount, GL_STATIC_DRAW),
-    pointLightBuffer(pointLightMat4Count * pointLightCount, GL_STATIC_DRAW),
-    cubeMatrices(6, GL_STATIC_DRAW)
+    pointLightBuffer(pointLightMat4Count * pointLightCount, GL_STATIC_DRAW)
 {
     glEnable(GL_DEPTH_TEST);
     if (usingSRGB && using_GL_SRGB) {
         glEnable(GL_FRAMEBUFFER_SRGB);
     }
     // 我觉得 cull back 阴影效果反而不好，不如 bias？
-    glEnable(GL_CULL_FACE);
+    //glEnable(GL_CULL_FACE);
 
     glClearColor(0.01f, 0.01f, 0.01f, 1.f);
 
@@ -299,11 +313,11 @@ Renderer::Renderer(const Scene &scene):
     }
     vBuffer.bindRange(0, 2 * sizeof(mat4), BINDING_POINT_VP);
     dirLightBuffer.bindRange(0, dirLightMat4Count * sizeof(mat4), BINDING_POINT_DIR_LIGHTS);
-    pointLightBuffer.bindRange(0, pointLightMat4Count * sizeof(mat4), BINDING_POINT_POINT_LIGHTS);
+    pointLightBuffer.bindRange(0, pointLightMat4Count * pointLightCount * sizeof(mat4), BINDING_POINT_POINT_LIGHTS);
     {
         auto &quad = scene.getHdrQuad();
         auto texId = getHdrBuffer().asTexture();
-        quad.setTextures({Texture(texId, DIFFUSE_TEXTURE)});
+        quad.setTextures({Texture(texId, diffuse)});
         quad.shader.use();
         quad.bindUniformBlock("Context", BINDING_POINT_CONTEXT);
         quad.shader.setBool("hdrMask", USE_HDR_COMPARING);
