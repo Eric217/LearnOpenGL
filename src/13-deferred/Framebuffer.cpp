@@ -20,22 +20,24 @@ void NormalFramebuffer::updateSize(int w, int h) {
     glTexImage2D (GL_TEXTURE_2D, 0/*level*/, fmt/*internalformat*/, w, h, 0/*border*/, GL_RGB /*data format*/ , srcFmt/*data type*/, 0/*data*/);
     
     glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-    glRenderbufferStorage(GL_FRAMEBUFFER, GL_DEPTH24_STENCIL8, w, h);
+    auto inFmt = usingStencil ? GL_DEPTH24_STENCIL8 : GL_DEPTH_COMPONENT32;
+    glRenderbufferStorage(GL_RENDERBUFFER, inFmt, w, h);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-NormalFramebuffer::NormalFramebuffer(int w, int h, bool hdr) {
+NormalFramebuffer::NormalFramebuffer(int w, int h, bool hdr, bool useStencil) {
     this->w = w;
     this->h = h;
     usingHdr = hdr;
+    usingStencil = useStencil;
     
     glGenFramebuffers(1, &Id);
     // 可以指定读/写缓冲命令作用到不同的缓冲，一般使用同一个 GL_FRAMEBUFFER
     // GL_READ_FRAMEBUFFER | GL_DRAW_FRAMEBUFFER
     glBindFramebuffer(GL_FRAMEBUFFER, Id);
     
-    // MARK: - 给 framebuffer attach buffers
+    // 给 framebuffer attach buffers
     
     // 1. color buffer 用 texture 实现（可读，用于采样）
     glGenTextures(1, &texId);
@@ -58,10 +60,12 @@ NormalFramebuffer::NormalFramebuffer(int w, int h, bool hdr) {
     // 特点：不采样、有优化
     glGenRenderbuffers(1, &rbo);
     glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, w, h);
+    auto inFmt = usingStencil ? GL_DEPTH24_STENCIL8 : GL_DEPTH_COMPONENT32;
+    glRenderbufferStorage(GL_RENDERBUFFER, inFmt, w, h);
 
+    auto attachFmt = usingStencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
     // attach
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, attachFmt, GL_RENDERBUFFER, rbo);
     
     // check
     auto checkResult = glCheckFramebufferStatus(GL_FRAMEBUFFER);
@@ -72,7 +76,8 @@ NormalFramebuffer::NormalFramebuffer(int w, int h, bool hdr) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-MRTNormalBuffer::MRTNormalBuffer(int w, int h, int targetCount, bool hdr): NormalFramebuffer(w, h, hdr) {
+// MARK: - for multiple render targets
+MRTNormalBuffer::MRTNormalBuffer(int w, int h, int targetCount, bool hdr, const int *targetChannelCount, int stencil): NormalFramebuffer(w, h, hdr, stencil) {
     texIds.push_back(texId);
     if (targetCount <= 1) {
         return;
@@ -83,7 +88,12 @@ MRTNormalBuffer::MRTNormalBuffer(int w, int h, int targetCount, bool hdr): Norma
         texIds.push_back(0);
         glGenTextures(1, &texIds[i]);
         glBindTexture(GL_TEXTURE_2D, texIds[i]);
-        GLenum fmt = usingHdr ? GL_RGB32F : GL_RGB;
+        int channels = targetChannelCount ? targetChannelCount[i] : 3;
+        assert(channels == 3 || channels == 4);
+        GLenum fmt8 = channels == 3 ? GL_RGB : GL_RGBA;
+        GLenum fmt32 = channels == 3 ? GL_RGB32F : GL_RGBA32F;
+        
+        GLenum fmt = usingHdr ? fmt32 : fmt8;
         GLenum srcFmt = usingHdr ? GL_FLOAT : GL_UNSIGNED_BYTE;
         glTexImage2D (GL_TEXTURE_2D, 0/*level*/, fmt/*internalformat*/, w, h, 0/*border*/, GL_RGB /*data format*/ , srcFmt/*data type*/, 0/*data*/);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -96,7 +106,7 @@ MRTNormalBuffer::MRTNormalBuffer(int w, int h, int targetCount, bool hdr): Norma
 void MRTNormalBuffer::updateSize(int w, int h) {
     NormalFramebuffer::updateSize(w, h);
     glBindFramebuffer(GL_FRAMEBUFFER, Id);
-
+    assert(false);// 补充 targetChannelCount
     for (int i = 1; i < texIds.size(); i++) {
         glBindTexture(GL_TEXTURE_2D, texIds[i]);
         GLenum fmt = usingHdr ? GL_RGB32F : GL_RGB;

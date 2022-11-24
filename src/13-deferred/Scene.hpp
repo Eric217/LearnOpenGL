@@ -17,6 +17,8 @@ class Scene {
     std::vector<std::shared_ptr<Light>> lights;
     std::shared_ptr<Model> skybox;
     std::shared_ptr<Model> hdrQuad;
+    std::shared_ptr<DeferredShadingData> deferredData;
+
     Shader gaussionFilter;
 
 public:
@@ -42,19 +44,30 @@ public:
     }
 
     Scene() {};
-    Scene(const Scene &s): models(s.models), lights(s.lights) {};
-    Scene(Scene &&s): models(std::move(s.models)), lights(std::move(s.lights)) {};
+    Scene(const Scene &s): models(s.models), lights(s.lights) {
+        assert(false);
+    };
+    Scene(Scene &&s): models(std::move(s.models)), lights(std::move(s.lights)) {
+        assert(false);
+    };
     
     typedef std::shared_ptr<Model> ModelPtr;
     typedef std::vector<std::shared_ptr<Model>> ModelArray;
     
     ModelArray allModels() const;
-    Model& getHdrQuad() const { return *hdrQuad.get(); }
+    Model& getHdrQuad() const { return *hdrQuad; }
+    Model& getDeferredQuad() const { return deferredData.get()->quad; }
+    Shader& getDeferredMRTShader() const { return deferredData.get()->mrtShader; }
+    Shader& getPointLightShader() const { return deferredData.get()->volumeShader; }
+    std::vector<std::shared_ptr<Model>>& getLightVolumes() const { return deferredData.get()->volumes; }
+
     void setHdrQuad(Model *model) { hdrQuad.reset(model); }
     void setBloomShader(const Shader &shader) { gaussionFilter = shader; }
+    void setDeferredData(DeferredShadingData *data) { deferredData.reset(data); }
 
+    const std::vector<std::shared_ptr<Light>>& getLights() const { return lights; }
     template<class T>
-    const std::vector<T*> getLights() const {
+    std::vector<T*> getLights() const {
         std::vector<T*> vec;
         for (int i = 0; i < lights.size(); i++) {
             auto p = dynamic_cast<T*>(lights[i].get());

@@ -28,6 +28,9 @@ public:
     
     virtual void updateSize(int w, int h) = 0;
     virtual GLuint asTexture() const = 0;
+    void bindToTarget(GLenum target) const {
+        glBindFramebuffer(target, Id);
+    }
     
 protected:
     GLuint Id;
@@ -41,18 +44,20 @@ protected:
     GLuint texId; // for color0
     GLuint rbo; // for depth and stencil
     bool usingHdr;
+    bool usingStencil;
 public:
-    NormalFramebuffer(int w, int h, bool hdr = false);
+    NormalFramebuffer(int w, int h, bool hdr = false, bool useStencil = true);
  
     GLuint asTexture() const { return texId; }
     void updateSize(int w, int h);
 
 };
 
+/// multiple render target，参数指定各 target channel 数
 class MRTNormalBuffer: public NormalFramebuffer {
     std::vector<GLuint> texIds;
 public:
-    MRTNormalBuffer(int w, int h, int targetCount = 1, bool hdr = false);
+    MRTNormalBuffer(int w, int h, int targetCount = 1, bool hdr = false, const int *targetChannelCount = 0, int stencil = 1);
     
     GLuint getTextureAt(int index) const { return texIds[index]; }
     

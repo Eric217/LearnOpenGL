@@ -18,7 +18,7 @@ layout(std140) uniform Context {
     int context_screen_w;
     int context_screen_h;
     float context_exposure;
-    // float slot;
+    float context_far_plane_ps;
 
     // vec4 slot1;
 };

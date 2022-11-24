@@ -47,15 +47,22 @@ void Texture::use(int index, GLenum wrap) const {
     }
 }
 
+const std::string& GetTTName(TextureType type) {
+    return TextureTypeName.find(type)->second;
+}
+
 /// shader 中纹理顺序必须按下面顺序摆放，激活单元绑定时按这个顺序绑定
 const std::map<TextureType, std::string> TextureTypeName = {
-    {TextureType::diffuse,    "texture_diffuse"      },
-    {TextureType::specular,   "texture_specular"     },
-    {TextureType::cubemap2d,  "texture_cubemap2d"    },
-    {TextureType::cubemap,    "texture_cubemap"      },
-    {TextureType::dirlight,   "texture_dirLight"     },
-    {TextureType::pointlight, "texture_pointLight"   },
-    {TextureType::bloom,      "texture_bloom"        },
+    {TextureType::diffuse,      "texture_diffuse"       },
+    {TextureType::specular,     "texture_specular"      },
+    {TextureType::cubemap2d,    "texture_cubemap2d"     },
+    {TextureType::cubemap,      "texture_cubemap"       },
+    {TextureType::dirlight,     "texture_dirLight"      },
+    {TextureType::pointlight,   "texture_pointLight"    },
+    {TextureType::bloom,        "texture_bloom"         },
+    {TextureType::deferPos,     "texture_deferPos"      },
+    {TextureType::deferNormal,  "texture_deferNormal"   },
+    {TextureType::deferColor,   "texture_deferColor"    },
 };
 
 static std::unordered_map<std::string, Texture> textureCache;

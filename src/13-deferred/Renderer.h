@@ -37,6 +37,15 @@ class Renderer {
     std::shared_ptr<MRTNormalBuffer> hdrBuffer;
     std::shared_ptr<PingPongBuffer> ppBuffer;
     
+    std::shared_ptr<MRTNormalBuffer> deferredBuffer;
+    
+    std::shared_ptr<MRTNormalBuffer> tmpBuffer;
+    std::shared_ptr<MRTNormalBuffer> tmp2Buffer;
+
+    std::shared_ptr<Model> tmpQuad;
+    Shader imageDrawer; // out 1 个 color
+    Shader image2Drawer; // out 2 个 color
+
 public:
     Renderer(const Scene &scene);
     ~Renderer(){};
@@ -47,9 +56,13 @@ public:
 private:
     void setup(const Scene &scene);
     void render1(Scene& scene, const Camera *camera, const Shader *customShader = 0);
-    void render2(Scene& scene, const Camera *camera, const Shader *customShader = 0);
-    void render3(Scene& scene, const Camera *camera, const Shader *customShader = 0);
+    void render2(Scene& scene, const Camera *camera);
+    void render3(Scene& scene, const Camera *camera);
+    void renderHDR(Scene& scene, const Camera *camera, const MRTNormalBuffer &buffer);
+    
     const MRTNormalBuffer& getHdrBuffer();
+    const MRTNormalBuffer& getDeferredBuffer();
+    void renderImage(GLuint id) const;
 };
 
 

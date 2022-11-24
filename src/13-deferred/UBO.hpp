@@ -58,6 +58,7 @@ struct UniformBuffer3f: UniformBuffer {
     int     screen_w    0       4
     int     screen_h    4       4
     float   exposure    8       4
+    float   farPlane_ps 12      4 // for point shadow
  */
 class ContextUBO {
 public:
@@ -74,7 +75,10 @@ public:
     }
     void updateCameraExposure(float exposure) {
         ubo.updateWord(2, exposure);
-    } 
+    }
+    void updateFarPlane_ps(float farPlane) {
+        ubo.updateWord(3, farPlane);
+    }
 };
 
 #endif /* UBO_hpp */

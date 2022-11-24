@@ -24,7 +24,8 @@ void AttenuatingLight::applyToShader(const Shader *shader, const std::string &do
 float AttenuatingLight::lightVolumeRadius(float threshold) {
     // (-b + (b2-4ac)^0.5) / 2a
     // a = k2, b = k1, c = k0 - 1/t
-    return (-k1 + sqrt(k1 * k1 - 4 * k2 * (k0 - 1/threshold))) / (2 * k2);
+    float intensity = diffuse.r;
+    return (-k1 + sqrt(k1 * k1 - 4 * k2 * (k0 - intensity/threshold))) / (2 * k2);
 }
 
 void DirLight::applyToShader(const Shader *shader, const std::string &domain) {

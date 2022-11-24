@@ -36,7 +36,7 @@ public:
 public:
     virtual void applyToShader(const Shader* shader, const std::string& domain);
     /// 参数代表光照强度为多少时视为最小可见光，如 5/256，返回值是衰减到这个强度时的半径
-    virtual float lightVolumeRadius(float threshold = 5.f/256.f);
+    virtual float lightVolumeRadius(float threshold = 4.f/256.f);
 };
 
 class DirLight: public Light {

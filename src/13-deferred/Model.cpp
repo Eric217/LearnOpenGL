@@ -99,17 +99,40 @@ static std::string useSamplerNamePrefix = "material.use_";
 static std::string lightPrefix = "lights.";
 static std::string useLightPrefix = "lights.use_";
 
-void Mesh::applyTextures(const Shader &shader) const {
+static std::string deferredPrefix = "deferred.";
+
+void Mesh::applyTextures(const Shader &shader, const std::vector<Texture> &textures) const {
     // 每个纹理绑到一个槽位上，按照类型绑到不同的 uniform sampler 上
-    auto diffNr = 0, specNr = 0, cubeNr = 0, cube2dNr = 0,
-    dirLightNr = 0, pointLightNr = 0, bloomNr = 0;
+    unsigned char diffNr = 0, specNr = 0, cubeNr = 0, cube2dNr = 0,
+    dirLightNr = 0, pointLightNr = 0, bloomNr = 0, dPosNr = 0, dNormNr = 0,
+    dColorNr = 0;
+    
+    // 同一个 shader 渲染多个物体时，有时有些值没有更新，暂时简单处理一下手动关掉
+    bool breaked = 0; // 不用手动关
+    for (int i = 0; i < textures.size(); i++) {
+        if (textures[i].type == diffuse) {
+            breaked = 1; break;
+        }
+    }
+    if (!breaked) {
+        shader.setBool(useSamplerNamePrefix + GetTTName(diffuse) + "0", false);
+    }
+    breaked = 0;
+    for (int i = 0; i < textures.size(); i++) {
+        if (textures[i].type == specular) {
+            breaked = 1; break;
+        }
+    }
+    if (!breaked) {
+        shader.setBool(useSamplerNamePrefix + GetTTName(specular) + "0", false);
+    }
     
     for (auto i = 0; i < textures.size(); i++) {
         textures[i].use(i, wrap);
         auto ttype = textures[i].type;
         auto &ttypeName = textures[i].typeName();
         
-        if (ttype == TextureType::diffuse) {
+        if (ttype == diffuse) {
             auto s = ttypeName + std::to_string(diffNr++);
             shader.setInt(samplerNamePrefix + s, i);
             shader.setBool(useSamplerNamePrefix + s, textures[i].shouldUse);
@@ -125,6 +148,7 @@ void Mesh::applyTextures(const Shader &shader) const {
             auto s = ttypeName + std::to_string(cube2dNr++);
             shader.setInt(samplerNamePrefix + s, i);
             shader.setBool(useSamplerNamePrefix + s, textures[i].shouldUse);
+            // MARK: - light
         } else if (ttype == dirlight) {
             auto s = ttypeName + std::to_string(dirLightNr++);
             shader.setInt(lightPrefix + s, i);
@@ -137,15 +161,33 @@ void Mesh::applyTextures(const Shader &shader) const {
             auto s = ttypeName + std::to_string(bloomNr++);
             shader.setInt(lightPrefix + s, i);
             shader.setBool(useLightPrefix + s, textures[i].shouldUse);
+            // MARK: - deferred
+        } else if (ttype == deferPos) {
+            auto s = ttypeName + std::to_string(dPosNr++);
+            shader.setInt(deferredPrefix + s, i);
+        } else if (ttype == deferNormal) {
+            auto s = ttypeName + std::to_string(dNormNr++);
+            shader.setInt(deferredPrefix + s, i);
+        } else if (ttype == deferColor) {
+            auto s = ttypeName + std::to_string(dColorNr++);
+            shader.setInt(deferredPrefix + s, i);
         } else {
             assert(false); // 未处理!
         }
     }
 }
 
+void Mesh::applyTextures(const Shader &shader) const {
+    applyTextures(shader, textures);
+}
+
 void Mesh::draw(const Shader &shader) const {
+    draw(shader, textures);
+}
+
+void Mesh::draw(const Shader& shader, const std::vector<Texture> &textures) const {
     glBindVertexArray(vao);
-    applyTextures(shader);
+    applyTextures(shader, textures);
     glDrawElements (GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
 }
 
@@ -281,6 +323,17 @@ void Model::draw(const Shader &shader) const {
     shader.use();
     for (const auto& mesh: meshes) {
         mesh.draw(shader);
+    }
+}
+
+void Model::draw(const std::vector<Texture> &textures) const {
+    draw(shader, textures);
+}
+
+void Model::draw(const Shader &shader, const std::vector<Texture> &textures) const {
+    shader.use();
+    for (const auto& mesh: meshes) {
+        mesh.draw(shader, textures);
     }
 }
 

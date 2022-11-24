@@ -28,6 +28,8 @@ extern bool usingHDR;
 extern bool usingSRGB;
 extern bool using_GL_SRGB;
 extern bool usingBloom;
+extern bool usingDeferred;
+extern bool debugShowLightVolume;
 
 Scene loadScene();
 

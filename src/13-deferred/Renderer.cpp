@@ -44,12 +44,12 @@ constexpr float ppBufferScale = 0.2;
 /// 预览用的几个局部变量/宏
 static Model *depthMap;
 
-#define USE_BLOOM_PREVIEW 0
-#define USE_DEPTH_PREVIEW 0
+#define USE_BLOOM_PREVIEW 0 // 看高斯模糊的效果
+#define USE_DEPTH_PREVIEW 0 // 看平行光的阴影图
 #define USE_CUBE_PREVIEW 0 // 预览第一个点光源的阴影图
 #define USE_CUBE_PREVIEW_1 0 // 预览第二个点光源的阴影图
-#define USE_FRONT_CULLING 0
-#define USE_HDR_COMPARING 0
+#define USE_FRONT_CULLING 0 // 要废弃了..效果不好
+#define USE_HDR_COMPARING 0 // 对比 HDR 开关效果
 
 void Renderer::render(Scene& scene, const Camera *camera) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -82,7 +82,11 @@ void Renderer::render(Scene& scene, const Camera *camera) {
     glCullFace(GL_BACK);
 #endif
     restoreDefaultViewport();
- 
+    
+    if (debugShowLightVolume) {
+        render1(scene, camera);
+        return;
+    }
     // 阴影预览
 #if USE_DEPTH_PREVIEW || USE_CUBE_PREVIEW || USE_CUBE_PREVIEW_1
     glFrontFace(GL_CW);
@@ -91,38 +95,119 @@ void Renderer::render(Scene& scene, const Camera *camera) {
 #else
     // 渲染世界
     // 如果不开 HDR、Bloom、Deferred，直接 render1 渲染到屏幕即可
-    render2(scene, camera);
+    if (!usingHDR && !usingBloom && !usingDeferred) {
+        render1(scene, camera);
+    } else if (!usingDeferred) {
+        render2(scene, camera);
+    } else {
+        render3(scene, camera);
+    }
 #endif
 }
 
 /// 延迟管线渲染
-void Renderer::render3(Scene& scene, const Camera *camera, const Shader *customShader) {
+void Renderer::render3(Scene& scene, const Camera *camera) {
+    auto &deferBuffer = getDeferredBuffer();
+    deferBuffer.activate();
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
+    // 把世界画到 3 个纹理
+    GLenum usingBuffers[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1,
+        GL_COLOR_ATTACHMENT2};
+    GLenum usingBuffers2[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+
+    glDrawBuffers(3, usingBuffers);
+    render1(scene, camera, &scene.getDeferredMRTShader());
+    deferBuffer.deactivate();
+    
+    auto &canvasBuffer = *tmp2Buffer.get();
+    auto &volumeBuffer = *tmpBuffer.get();
+    canvasBuffer.activate();
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glDrawBuffers(2, usingBuffers2); // bloom
+
+    // 直接绘制 quad 虽然可以直接计算所有光源着色，但无法用 light volume 优化点光源
+    auto &quad = scene.getDeferredQuad();
+    // 因此这里只着色 dir light，一会画 light volume
+    quad.draw();
+    // 至此就可以显示 canvas 看延迟管线的效果了！下面开始用优化的方式进行点光源着色
+    canvasBuffer.deactivate();
+    
+    // 光体积可见的像素进行点光源着色
+    // 为了提高性能，球只画一面，但是相机进入球内会丢掉画面，可以临时改为 cull front
+    glCullFace(GL_FRONT);
+    // 因为要和延迟管线的 dir light 图合并，我们可以使用 blend 或两个纹理进行采样
+    // 两次在同一个 buffer 里 draw + blend 有问题：
+    // 某次 draw 后续可能因为深度大被丢弃，但颜色已经 blend 进去了！必须单独开 buffer 画一次
+    volumeBuffer.activate();
+    glDrawBuffers(2, usingBuffers2); // bloom
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    auto &volumes = scene.getLightVolumes();
+    for (int i = 0; i < volumes.size(); i ++) {
+        volumes[i].get()->draw(scene.getPointLightShader());
+    }
+    volumeBuffer.deactivate();
+    glCullFace(GL_BACK);
+    // canvas(tmp2) 和 tmp 各存了一部分 bloom
+    
+    // blend 到 canvas，1+1 模式
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE);
+    canvasBuffer.activate();
+    tmpQuad.get()->draw(image2Drawer);
+    glDisable(GL_BLEND);
+    // 现在 canvas 已有深度为 1（两次 quad），color、bloom 都 blend 来了
+    
+    // lights redraw，需要 blit 深度，画 lights，用灯本身的颜色着色
+    // blit 传送的 src、dst 分别是当前绑定的 GL_READ_FRAMEBUFFER、GL_DRAW_FRAMEBUFFER
+    // 这里有一个隐藏问题，canvas 看起来可以换成是屏幕，但是屏幕的深度缓存位数或格式不同，
+    // 导致我们自己的 DEPTH32/24 的 buffer blit 过去之后损失精度。
+    // 这个时候用失真的 z-buffer 画灯，会有 z-fighting，所以只能全画到 canvas
+    deferBuffer.bindToTarget(GL_READ_FRAMEBUFFER);
+    canvasBuffer.bindToTarget(GL_DRAW_FRAMEBUFFER);
+    glBlitFramebuffer(0, 0, deferBuffer.w, deferBuffer.h,
+                      0, 0, canvasBuffer.w, canvasBuffer.h,
+                      GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+    // 现在 canvas 是所有物体的正确深度，开始重新画灯，同时写入 bloom
+    for (auto &light: scene.getLights()) {
+        auto model = dynamic_cast<Model*>(light.get());
+        if (model) {
+            model->draw();
+        }
+    }
+    canvasBuffer.deactivate();
+    // 现在场景颜色都保存在 canvasBuffer 中，如果 blit 到屏幕，则不会伽马校正！
+/*  // 所以用以下代码没有 SRGB 显示起来巨暗！
+    canvasBuffer.bindToTarget(GL_READ_FRAMEBUFFER);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    glBlitFramebuffer(0, 0, canvasBuffer.w, canvasBuffer.h,
+                      0, 0, screenPixelW, screenPixelH,
+                      GL_COLOR_BUFFER_BIT, GL_NEAREST);
+  */
+    if (usingHDR) {
+        renderHDR(scene, camera, canvasBuffer);
+    } else {
+        // 这里会失真严重
+        // 因为 mrt 肯定是 32 位，虽然颜色可以做 8 位，但我偷懒，给颜色也统一用了 32
+        // 现在 canvas 是 8 位，导致画上去失真
+        renderImage(canvasBuffer.getTextureAt(0));
+    }
 }
 
-/// HDR & Bloom
-void Renderer::render2(Scene& scene, const Camera *camera, const Shader *customShader) {
-    
-    // 把世界离屏渲染到 hdr buffer，同时多目标渲染一个光源图
-    getHdrBuffer().activate();
-    if (usingBloom) {
-        GLenum usingBuffers[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
-        glDrawBuffers(2, usingBuffers);
-    }
-    glClearColor(0, 0, 0, 1);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    render1(scene, camera, customShader);
-    getHdrBuffer().deactivate();
-     
+void Renderer::renderImage(GLuint id) const {
+    tmpQuad.get()->draw(imageDrawer, {Texture(id, diffuse)});
+}
+
+void Renderer::renderHDR(Scene& scene, const Camera *camera, const MRTNormalBuffer &buffer) {
+    auto &quad = scene.getHdrQuad();
     if (!usingBloom) {
-        scene.getHdrQuad().draw();
+        quad.draw({Texture(buffer.getTextureAt(0), diffuse)});
         return;
     }
-
     // 现在把光源图进行高斯模糊，优化后的高斯算法需要使用 pingpong buffer 提高效率
-    auto &quad = scene.getHdrQuad();
-    auto baseTex = Texture(getHdrBuffer().getTextureAt(0), diffuse);
-    auto lightTex = Texture(getHdrBuffer().getTextureAt(1), diffuse);
+    auto baseTex = Texture(buffer.getTextureAt(0), diffuse);
+    auto lightTex = Texture(buffer.getTextureAt(1), diffuse);
     auto &pFrameBuffer = *ppBuffer.get();
     auto &shader = scene.gaussionFilter;
     
@@ -153,6 +238,22 @@ void Renderer::render2(Scene& scene, const Camera *camera, const Shader *customS
     });
 #endif
     quad.draw();
+}
+
+/// HDR & Bloom
+void Renderer::render2(Scene& scene, const Camera *camera) {
+    // 把世界离屏渲染到 hdr buffer，同时多目标渲染一个光源图
+    getHdrBuffer().activate();
+    if (usingBloom) {
+        GLenum usingBuffers[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+        glDrawBuffers(2, usingBuffers);
+    }
+    glClearColor(0, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    render1(scene, camera);
+    getHdrBuffer().deactivate();
+     
+    renderHDR(scene, camera, getHdrBuffer());
 }
 
 /// 渲染 models
@@ -197,6 +298,9 @@ void Renderer::setup(const Scene &scene) {
         for (auto &model: models) {
             model.get()->appendTextures(vec);
         }
+        if (usingDeferred) {
+            scene.getDeferredQuad().appendTextures(vec);
+        }
         light.Model::shader.use();
         light.Model::shader.setVec3("lightColor", light.ambient);
     }
@@ -234,6 +338,12 @@ void Renderer::setup(const Scene &scene) {
         auto &models = scene.models;
         for (auto &model: models) {
             model.get()->appendTextures(vec);
+        }
+        if (usingDeferred) {
+            auto &volumes = scene.getLightVolumes();
+            for (auto &volume: volumes) {
+                volume.get()->appendTextures(vec);
+            }
         }
         pointLightBuffer.update(0 + 4 * pointLightMat4Count * i, light.position);
         pointLightBuffer.update(1 + 4 * pointLightMat4Count * i, light.ambient);
@@ -280,6 +390,12 @@ void Renderer::updateScreenSize(int w, int h) {
     if (ppBuffer) {
         ppBuffer.get()->updateSize(w * ppBufferScale, h * ppBufferScale);
     }
+    if (deferredBuffer) {
+        deferredBuffer.get()->updateSize(w, h);
+    }
+    tmpBuffer.get()->updateSize(w, h);
+    tmp2Buffer.get()->updateSize(w, h);
+
     context.updateScreenSize(w, h);
 }
 
@@ -287,16 +403,21 @@ Renderer::Renderer(const Scene &scene):
     vBuffer(2, GL_STREAM_DRAW),
     context(BINDING_POINT_CONTEXT),
     dirLightBuffer(dirLightMat4Count * dirLightCount, GL_STATIC_DRAW),
-    pointLightBuffer(pointLightMat4Count * pointLightCount, GL_STATIC_DRAW)
+    pointLightBuffer(pointLightMat4Count * pointLightCount, GL_STATIC_DRAW),
+    imageDrawer(SHADER_DIR"/preview/image.vs", SHADER_DIR"/preview/image.fs"),
+    image2Drawer(SHADER_DIR"/preview/image.vs", SHADER_DIR"/preview/2image.fs"),
+    tmpQuad(new Model(GLOBAL_MODEL_DIR"/quad/quad.obj", 0, mat4(1), GL_CLAMP_TO_EDGE))
 {
     glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL); // 让 quad 深度为 1 时可以显示
+    
     if (usingSRGB && using_GL_SRGB) {
         glEnable(GL_FRAMEBUFFER_SRGB);
     }
     // 我觉得 cull back 阴影效果反而不好，不如 bias？
-    //glEnable(GL_CULL_FACE);
+    glEnable(GL_CULL_FACE);
 
-    glClearColor(0.01f, 0.01f, 0.01f, 1.f);
+    glClearColor(0, 0, 0, 1.f);
 
     
     // 手动定义槽位意义：绑定好相关的全局 uniform，ubo
@@ -326,6 +447,50 @@ Renderer::Renderer(const Scene &scene):
         ppBuffer.reset(new PingPongBuffer(screenPixelW * ppBufferScale, screenPixelW * ppBufferScale, usingHDR));
     }
     context.updateScreenSize(screenPixelW, screenPixelH);
+    context.updateFarPlane_ps(pointShadowFarPlane);
+    
+    if (usingDeferred) {
+        // 一个 world pos，一个 normal，一个 diffuse + specular(spec as alpha channel)
+        int channels[] = {3, 3, 4};
+        // 这个 buffer 必须 32 位，因为不是纯粹的颜色，而是点/向量
+        auto p = new MRTNormalBuffer(screenPixelW, screenPixelH, 3, 1, channels, 0);
+        deferredBuffer.reset(p);
+        
+        std::vector<Texture> tex = {
+            Texture(p->getTextureAt(0), deferPos),
+            Texture(p->getTextureAt(1), deferNormal),
+            Texture(p->getTextureAt(2), deferColor),
+        };
+
+        auto &quad = scene.getDeferredQuad();
+        quad.setTextures({});
+        quad.appendTextures((tex));
+        quad.prepareDrawing();
+        quad.bindUniformBlock("DirLights", BINDING_POINT_DIR_LIGHTS);
+        quad.bindUniformBlock("ViewProjection", BINDING_POINT_VP);
+
+        scene.getDeferredMRTShader().use();
+        scene.getDeferredMRTShader().bindUniformBlock("ViewProjection", BINDING_POINT_VP);
+        
+        auto &volumes = scene.getLightVolumes();
+        for (int i = 0; i < volumes.size(); i ++) {
+            volumes[i].get()->setTextures({});
+            volumes[i].get()->appendTextures(tex);
+        }
+        scene.getPointLightShader().use();
+        scene.getPointLightShader().bindUniformBlock("Context", BINDING_POINT_CONTEXT);
+        scene.getPointLightShader().bindUniformBlock("PointLights", BINDING_POINT_POINT_LIGHTS);
+        scene.getPointLightShader().bindUniformBlock("ViewProjection", BINDING_POINT_VP);
+        
+        glClearColor(0, 0, 0, 1);
+    }
+    tmpBuffer.reset(new MRTNormalBuffer(screenPixelW, screenPixelH, 2, usingHDR, 0, 0));
+    tmp2Buffer.reset(new MRTNormalBuffer(screenPixelW, screenPixelH, 2, usingHDR, 0, 0));
+    
+    tmpQuad.get()->setTextures({
+        Texture(tmpBuffer.get()->getTextureAt(0), diffuse),
+        Texture(tmpBuffer.get()->getTextureAt(1), diffuse), // bloom 用的
+    });
     
     setup(scene);
 }
@@ -335,6 +500,10 @@ const MRTNormalBuffer& Renderer::getHdrBuffer() {
         return *hdrBuffer;
     }
     hdrBuffer = std::shared_ptr<MRTNormalBuffer>(
-        new MRTNormalBuffer(config::screenPixelW, config::screenPixelH, 2, usingHDR));
+        new MRTNormalBuffer(screenPixelW, screenPixelH, 2, usingHDR, 0, 0));
     return *hdrBuffer;
+}
+
+const MRTNormalBuffer& Renderer::getDeferredBuffer() {
+    return *deferredBuffer;
 }

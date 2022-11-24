@@ -26,12 +26,12 @@ int config::screenPixelH = 0;
 float config::cameraStep = 6;
 float config::cameraFarPlane = 200;
 
-bool config::usingHDR = true;
+bool config::usingHDR = 1;
 bool config::usingSRGB = true;
 bool config::using_GL_SRGB = true;
 bool config::usingBloom = 1;
-
-#define SHOW_LIGHT_VOLUME 0
+bool config::usingDeferred = 1;
+bool config::debugShowLightVolume = 0;
 
 Scene config::loadScene() {
     const std::string cubeDir = GLOBAL_MODEL_DIR"/cube/cube.obj";
@@ -50,8 +50,8 @@ Scene config::loadScene() {
     {
         auto shader = Shader(shaderDir + "/object/v.vs", shaderDir + "/object/f.fs");
         // 在屏幕上分别是 3, 1, 2
-        vec3 positions[3] = { {2, -0.1501, -4.6},   {-3, 1.3001, 3},{0,   0.1003, 0  }};
-        vec3 scales[3] =    { {1.03, 0.85, 1.03},   {1,  2.3, 1},   {1.2, 1.1,    1.2}};
+        vec3 positions[3] = { {2, -0.1501, -4.3},   {-3, 1.3001, 3},{0,   0.1003, 0  }};
+        vec3 scales[3] =    { {0.7, 0.85, 0.7},   {1,  2.3, 1},   {1.2, 1.1,    1.2}};
         for (int i = 0; i < 3; i++) {
             scene.addModel(containerDir,
                            scale(translate(id4, positions[i]), scales[i]),
@@ -88,7 +88,7 @@ Scene config::loadScene() {
         auto &light = *sunPtr;
         light.name = "dirLights";
         light.direction = dir;
-        light.ambient = vec3(255, 198, 107)/255.f * 0.08f;
+        light.ambient = vec3(255, 198, 107)/255.f * 0.075f;
         light.diffuse = light.ambient;
         light.specular = light.ambient;
         light.Light::shader = shadowShader;
@@ -101,6 +101,9 @@ Scene config::loadScene() {
         vec3(0.59f, 1.8f, -2.45f),
         vec3(-8.2f, 5.83f, -5.3f),
     };
+    
+    std::vector<std::shared_ptr<Model>> volumes;
+    
     for (int i = 0; i < 2; i++) {
         auto mat = translate(id4, bulbTrans[i]);
         mat *= scale(id4, vec3(0.1f, 0.1f, 0.1f));
@@ -114,25 +117,31 @@ Scene config::loadScene() {
         bulb.Model:: shader = lightShader;
         bulb.Light:: shader = shadowShader;
         
+        float rate = 1;
         bulb.name = "pointLights";
-        bulb.ambient = vec3(i == 0 ? 18 : 21);
+        bulb.ambient = rate * vec3(i == 0 ? 18 : 15);
         bulb.diffuse = bulb.ambient;
         bulb.specular = bulb.ambient;
         bulb.k0 = 1;
-        bulb.k1 = 0.09;
-        bulb.k2 = i == 0 ? 2 : 2.5;
+        bulb.k1 = 0.001;
+        bulb.k2 = i == 0 ? 9 : 11;
         bulb.r = bulb.lightVolumeRadius();
         
         std::shared_ptr<Bulb> ptr(bulbPtr);
         scene.addLight(ptr);
         scene.addModel(ptr);
         
-#if SHOW_LIGHT_VOLUME
-        auto shader = Shader(SHADER_DIR"/volume/v.vs", SHADER_DIR"/volume/f.fs");
         // 110 是模型的半径
         auto t = translate(id4, bulb.position) * scale(id4, vec3(bulb.r / 110));
-        scene.addModel(ballDir, t, shader);
-#endif
+        if (debugShowLightVolume) {
+            auto shader = Shader(SHADER_DIR"/volume/preview.vs",
+                                 SHADER_DIR"/volume/preview.fs");
+            scene.addModel(ballDir, t, shader);
+        } else {
+            if (usingDeferred) {
+                volumes.push_back(std::make_shared<Model>(ballDir, 0, t));
+            }
+        }
     }
     {
         auto shader = Shader(SHADER_DIR"/hdr/v.vs", SHADER_DIR"/hdr/f.fs");
@@ -142,6 +151,16 @@ Scene config::loadScene() {
     if (usingBloom) {
         scene.setBloomShader(Shader(SHADER_DIR"/bloom/v.vs",
                                     SHADER_DIR"/bloom/f.fs"));
+    }
+    if (usingDeferred) {
+        const std::string s = SHADER_DIR "/deferred/";
+        auto quadShader = Shader(s + "quad/v.vs", s + "quad/f.fs");
+        auto data = new DeferredShadingData(
+                            Model(quadDir, quadShader, id4, GL_CLAMP_TO_EDGE),
+                            Shader(s + "mrt/v.vs", s + "mrt/f.fs"));
+        data->volumes = std::move(volumes);
+        data->volumeShader = Shader(s + "volume/v.vs", s + "volume/f.fs");
+        scene.setDeferredData(data);
     }
     return scene;
 }

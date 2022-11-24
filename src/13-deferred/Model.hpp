@@ -60,6 +60,8 @@ public:
     Mesh(Mesh &&mesh);
     
     void draw(const Shader& shader) const;
+    void draw(const Shader& shader, const std::vector<Texture> &textures) const;
+    
     void updateTransform(const glm::mat4 &t) {
         transform = t;
         update();
@@ -71,6 +73,8 @@ private:
     void update();
 
     void applyTextures(const Shader &shader) const;
+    void applyTextures(const Shader &shader, const std::vector<Texture> &textures) const;
+    
     void updateTexture(GLuint Id) { textures[0].ID = Id; }
     const glm::vec3& randomVertex() { return usingVertices[0].position; };
 };
@@ -93,6 +97,9 @@ public:
 
     void draw() const { draw(shader); }
     void draw(const Shader &shader) const;
+    void draw(const std::vector<Texture> &textures) const;
+    void draw(const Shader &shader, const std::vector<Texture> &textures) const;
+
     Shader& prepareDrawing() { shader.use(); return shader; };
     void applyTextures() const {
         shader.use();
@@ -156,6 +163,17 @@ public:
 private:
     Sun(const Sun &sun): Model(sun) {};
     Sun(Sun &&sun): Model(sun) {};
+};
+
+class DeferredShadingData {
+public:
+    Model quad;
+    Shader mrtShader;
+    std::vector<std::shared_ptr<Model>> volumes;
+    Shader volumeShader;
+public:
+    DeferredShadingData(const Model &quad, const Shader &shader):
+        quad(quad), mrtShader(shader) {}
 };
 
 #endif /* Model_hpp */

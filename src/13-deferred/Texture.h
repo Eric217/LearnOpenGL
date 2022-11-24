@@ -16,9 +16,12 @@ class Texture;
 
 enum TextureType {
     diffuse, specular, cubemap2d, cubemap, dirlight, pointlight,
-    bloom
+    bloom, deferPos, deferNormal, deferColor
 };
 extern const std::map<TextureType, std::string> TextureTypeName;
+
+const std::string& GetTTName(TextureType type);
+
 
 class Texture {
 public:
