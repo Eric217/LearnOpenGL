@@ -1,0 +1,410 @@
+//
+//  Model.cpp
+//  06-model
+//
+//  Created by Eric on 2022/10/10.
+//
+
+#include "Model.hpp"
+
+void Mesh::setup() {
+    makeUsingVertices();
+    sortTextures();
+    
+    GLuint buffers[2];
+    glGenBuffers(2, buffers);
+    vbo = buffers[0];
+    ebo = buffers[1];
+    glGenVertexArrays(1, &vao);
+    
+    glBindVertexArray(vao);
+    
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData (GL_ARRAY_BUFFER, usingVertices.size() * sizeof(Vertex),
+                  &usingVertices[0], GL_STATIC_DRAW);
+    
+    glVertexAttribPointer (0, 3, GL_FLOAT, false, sizeof(Vertex), (void *)offsetof(Vertex, position));
+    glVertexAttribPointer (1, 3, GL_FLOAT, false, sizeof(Vertex), (void *)offsetof(Vertex, normal));
+    glVertexAttribPointer (2, 2, GL_FLOAT, false, sizeof(Vertex), (void *)offsetof(Vertex, texCoor));
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glEnableVertexAttribArray(2);
+    
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), &indices[0], GL_STATIC_DRAW);
+}
+
+void Mesh::makeUsingVertices() {
+    bool usePush = usingVertices.size() != vertices.size();
+    auto normalMat = glm::transpose(glm::inverse(transform));
+    
+    if (usePush) {
+        usingVertices.clear();
+        if (normalMat == mat4(1)) {
+            usingVertices = vertices;
+            return;
+        }
+    }
+     
+    for (int i = 0; i < vertices.size(); i++) {
+        if (usePush) {
+            auto v = vertices[i];
+            v.assignVec3(0, transform * glm::vec4(v.position, 1));
+            v.assignVec3(1, glm::normalize(normalMat * glm::vec4(v.normal, 0)));
+            usingVertices.push_back(std::move(v));
+        } else {
+            usingVertices[i].assignVec3(0, transform * glm::vec4(vertices[i].position, 1));
+            usingVertices[i].assignVec3(1, glm::normalize(normalMat * glm::vec4(vertices[i].normal, 0)));
+        }
+    }
+}
+
+void Mesh::update() {
+    makeUsingVertices();
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData (GL_ARRAY_BUFFER, usingVertices.size() * sizeof(Vertex),
+                  &usingVertices[0], GL_DYNAMIC_DRAW);
+}
+
+Mesh::Mesh(Mesh &&mesh) {
+    vao = mesh.vao;
+    vbo = mesh.vbo;
+    ebo = mesh.ebo;
+    wrap = mesh.wrap;
+    transform = std::move(mesh.transform);
+    vertices = std::move(mesh.vertices);
+    indices = std::move(mesh.indices);
+    textures = std::move(mesh.textures);
+    usingVertices = std::move(mesh.usingVertices);
+}
+
+Mesh::Mesh(const Mesh &mesh) {
+    vao = mesh.vao;
+    vbo = mesh.vbo;
+    ebo = mesh.ebo;
+    wrap = mesh.wrap;
+    transform = mesh.transform;
+    vertices = mesh.vertices;
+    indices = mesh.indices;
+    textures = mesh.textures;
+    usingVertices = mesh.usingVertices;
+}
+
+Mesh::~Mesh() {
+}
+
+static std::string samplerNamePrefix = "material.";
+static std::string useSamplerNamePrefix = "material.use_";
+
+static std::string lightPrefix = "lights.";
+static std::string useLightPrefix = "lights.use_";
+
+static std::string deferredPrefix = "deferred.";
+static std::string useDeferredPrefix = "deferred.use_";
+
+void Mesh::applyTextures(const Shader &shader, const std::vector<Texture> &textures) const {
+    // 每个纹理绑到一个槽位上，按照类型绑到不同的 uniform sampler 上
+    unsigned char diffNr = 0, specNr = 0, cubeNr = 0, cube2dNr = 0,
+    dirLightNr = 0, pointLightNr = 0, bloomNr = 0, dPosNr = 0, dNormNr = 0,
+    dColorNr = 0, aoMapNr = 0;
+    
+    int baseC = 0;
+    bool hasDiffuse = 0, hasSpec = 0;
+    // 同一个 shader 渲染多个物体时，有时有些值没有更新，暂时简单处理一下手动关掉
+    bool breaked = 0; // 不用手动关
+    for (int i = 0; i < textures.size(); i++) {
+        if (textures[i].type == diffuse) {
+            breaked = 1; break;
+        }
+    }
+    hasDiffuse = breaked;
+    baseC += hasDiffuse;
+    if (!breaked) {
+        shader.setBool(useSamplerNamePrefix + GetTTName(diffuse) + "0", false);
+    }
+    breaked = 0;
+    for (int i = 0; i < textures.size(); i++) {
+        if (textures[i].type == specular) {
+            breaked = 1; break;
+        }
+    }
+    hasSpec = breaked;
+    baseC += hasSpec;
+
+    if (!breaked) {
+        shader.setBool(useSamplerNamePrefix + GetTTName(specular) + "0", false);
+    }
+    // 下面是一些 trick。多 mesh 且 mesh 纹理不同的模型，如果用同一个 shader
+    // 则需要频繁改纹理绑定位置，CPU 占用 100%，
+    // 要么让纹理有固定的 slot 要么每个 mesh 一个 shader（以后改成这样）
+    for (auto i = 0; i < textures.size(); i++) {
+        auto ttype = textures[i].type;
+        auto &ttypeName = textures[i].typeName();
+        int slot = i;
+        if (baseC == 0) {
+            slot += 2;
+        } else if (baseC == 1) {
+            if (hasSpec) {
+                slot += 1;
+            } else {
+                if (ttype != diffuse) {
+                    slot += 1;
+                }
+            }
+        }
+         
+        textures[i].use(slot, wrap);
+      
+        if (ttype == diffuse) {
+            auto s = ttypeName + std::to_string(diffNr++);
+            shader.setInt(samplerNamePrefix + s, slot);
+            shader.setBool(useSamplerNamePrefix + s, textures[i].shouldUse);
+        } else if (ttype == specular) {
+            auto s = ttypeName + std::to_string(specNr++);
+            shader.setInt(samplerNamePrefix + s, slot);
+            shader.setBool(useSamplerNamePrefix + s, textures[i].shouldUse);
+        } else if (ttype == cubemap) {
+            auto s = ttypeName + std::to_string(cubeNr++);
+            shader.setInt(samplerNamePrefix + s, slot);
+            shader.setBool(useSamplerNamePrefix + s, textures[i].shouldUse);
+        } else if (ttype == cubemap2d) {
+            auto s = ttypeName + std::to_string(cube2dNr++);
+            shader.setInt(samplerNamePrefix + s, slot);
+            shader.setBool(useSamplerNamePrefix + s, textures[i].shouldUse);
+            // MARK: - light
+        } else if (ttype == dirlight) {
+            auto s = ttypeName + std::to_string(dirLightNr++);
+            shader.setInt(lightPrefix + s, slot);
+            shader.setBool(useLightPrefix + s, textures[i].shouldUse);
+        } else if (ttype == pointlight) {
+            auto s = ttypeName + std::to_string(pointLightNr++);
+            shader.setInt(lightPrefix + s, slot);
+            shader.setBool(useLightPrefix + s, textures[i].shouldUse);
+        } else if (ttype == bloom) {
+            auto s = ttypeName + std::to_string(bloomNr++);
+            shader.setInt(lightPrefix + s, slot);
+            shader.setBool(useLightPrefix + s, textures[i].shouldUse);
+            // MARK: - deferred
+        } else if (ttype == deferPos) {
+            auto s = ttypeName + std::to_string(dPosNr++);
+            shader.setInt(deferredPrefix + s, slot);
+        } else if (ttype == deferNormal) {
+            auto s = ttypeName + std::to_string(dNormNr++);
+            shader.setInt(deferredPrefix + s, slot);
+        } else if (ttype == deferColor) {
+            auto s = ttypeName + std::to_string(dColorNr++);
+            shader.setInt(deferredPrefix + s, slot);
+        } else if (ttype == aoMap) {
+            auto s = ttypeName + std::to_string(aoMapNr++);
+            shader.setInt(deferredPrefix + s, slot);
+            shader.setBool(useDeferredPrefix + s, textures[i].shouldUse);
+        } else if (ttype == aoNoise) {
+            auto s = ttypeName + std::to_string(0); // 暂时写死 0 个
+            shader.setInt(deferredPrefix + s, slot);
+        } else {
+            assert(false); // 未处理!
+        }
+    }
+}
+
+void Mesh::applyTextures(const Shader &shader) const {
+    applyTextures(shader, textures);
+}
+
+void Mesh::draw(const Shader &shader) const {
+    draw(shader, textures);
+}
+
+void Mesh::draw(const Shader& shader, const std::vector<Texture> &textures) const {
+    glBindVertexArray(vao);
+    applyTextures(shader, textures);
+    glDrawElements (GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
+}
+
+#include <iostream>
+  
+void Mesh::sortTextures() {
+    if (textures.size() <= 1) {
+        return;
+    }
+    std::sort(textures.begin(), textures.end(), [](Texture &left, Texture& right) {
+        return left.type < right.type;
+    });
+        
+    std::string orders("texture orders:");
+    for (Texture &t : textures) {
+        orders.append(std::to_string(t.type) + ", ");
+    }
+    std::cout << orders << std::endl;
+}
+
+// MARK: - Model
+#include <assimp/Importer.hpp>
+#include <assimp/postprocess.h>
+
+std::vector<Texture> Model::loadTexture(const aiMaterial& mat, aiTextureType type, TextureType tType, bool useMipmap) {
+    std::vector<Texture> textures;
+    
+    auto dCount = mat.GetTextureCount(type);
+
+    for (int j = 0; j < dCount; j++) {
+        aiString p;
+        mat.GetTexture(type, j, &p);
+        if (!p.length) {
+            continue;
+        }
+        auto path = directory + p.C_Str();
+        auto t = Texture::load(path, tType, useMipmap);
+        textures.push_back(std::move(t));
+    }
+    return textures;
+}
+
+void Model::processNode(const aiScene* scene, aiNode *node, Node &mynode) {
+    if (!node) {
+        return;
+    }
+
+    for (int i = 0; i < node->mNumMeshes; i++) {
+        const auto meshIdx = node->mMeshes[i];
+        const auto mesh = scene->mMeshes[meshIdx];
+        
+        assert(mesh->HasNormals());
+        std::vector<unsigned int> indices;
+        std::vector<Vertex> vertices;
+        std::vector<Texture> textures;
+        
+        for (int j = 0; j < mesh->mNumVertices; j++) {
+            Vertex v;
+            v.position = glm::vec4(mesh->mVertices[j].x, mesh->mVertices[j].y, mesh->mVertices[j].z, 1);
+            v.normal = glm::vec3(mesh->mNormals[j].x, mesh->mNormals[j].y, mesh->mNormals[j].z);
+            if (mesh->mTextureCoords && mesh->mTextureCoords[0]) {
+                const auto& c = mesh->mTextureCoords[0][j];
+                v.texCoor = glm::vec2(c.x, c.y);
+            } else {
+                v.texCoor = glm::vec2(0);
+            }
+            vertices.push_back(std::move(v));
+        }
+        for (int j = 0; j < mesh->mNumFaces; j++) {
+            const auto& face = mesh->mFaces[j];
+            assert(face.mNumIndices == 3);
+            for (int k = 0; k < face.mNumIndices; k++) {
+                indices.push_back(face.mIndices[k]);
+            }
+        }
+        // 一个 mesh 对应一个 material
+        if (scene->mMaterials && mesh->mMaterialIndex < scene->mNumMaterials &&
+            scene->mMaterials[mesh->mMaterialIndex]) {
+            const auto& mat = *(scene->mMaterials[mesh->mMaterialIndex]);
+            {
+                auto vec = loadTexture(mat, aiTextureType_DIFFUSE, diffuse, useMipmap);
+                textures.insert(textures.end(),
+                                std::make_move_iterator(vec.begin()),
+                                std::make_move_iterator(vec.end()));
+            }
+            {
+                auto vec = loadTexture(mat, aiTextureType_SPECULAR, specular, useMipmap);
+                textures.insert(textures.end(),
+                                std::make_move_iterator(vec.begin()),
+                                std::make_move_iterator(vec.end()));
+            }
+        }
+        meshes.push_back(Mesh(vertices, indices, textures, modelMat, wrap));
+        mynode.meshes.push_back(&meshes[meshes.size() - 1]);
+    }
+    for (int i = 0; i < node->mNumChildren; i++) {
+        Node child;
+        processNode(scene, node->mChildren[i], child);
+        mynode.children.push_back(std::move(child));
+    }
+}
+
+void Model::updateTransform(const glm::mat4 &transform) {
+    modelMat = transform;
+    for (auto& mesh: meshes) {
+        mesh.updateTransform(transform);
+    }
+}
+
+void Model::setTextures(std::vector<Texture> &&textures) {
+    for (int i = 0; i < meshes.size(); i++) {
+        meshes[i].textures = textures;
+        meshes[i].sortTextures();
+    }
+}
+
+void Model:: appendTextures(const std::vector<Texture> &textures) {
+    for (int i = 0; i < meshes.size(); i++) {
+        meshes[i].textures.insert(meshes[i].textures.end(), textures.begin(), textures.end());
+        meshes[i].sortTextures();
+    }
+}
+
+void Model::load(const std::string &path) {
+    Assimp::Importer i;
+    const aiScene *scene = i.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenNormals);
+    if (!scene || !scene->HasMeshes()) {
+        assert(false);
+        return;
+    }
+    
+    directory = path.substr(0, path.find_last_of('/') + 1);
+    processNode(scene, scene->mRootNode, rootNode);
+}
+
+void Model::draw(const Shader &shader) const {
+    shader.use();
+    for (const auto& mesh: meshes) {
+        mesh.draw(shader);
+    }
+}
+
+void Model::draw(const std::vector<Texture> &textures) const {
+    draw(shader, textures);
+}
+
+void Model::draw(const Shader &shader, const std::vector<Texture> &textures) const {
+    shader.use();
+    for (const auto& mesh: meshes) {
+        mesh.draw(shader, textures);
+    }
+}
+ 
+void Model:: appendUniqueTextures(const std::vector<Texture> &textures) {
+    for (int i = 0; i < meshes.size(); i++) {
+        auto &texs = meshes[i].textures;
+        bool find = false;
+        for (auto& tex: texs) {
+            if (tex.type == textures[0].type) {
+                tex.ID = textures[0].ID;
+                find = true;
+                break;
+            }
+        }
+        if (find) {
+            continue;
+        }
+        texs.push_back(textures[0]);
+        meshes[i].sortTextures();
+    }
+}
+
+void Model::draw(const Shader &shader, const std::vector<Texture> &textures, const Framebuffer &buffer, GLbitfield clearMask) const {
+    buffer.activate();
+    glClear(clearMask);
+
+    draw(shader, textures);
+    buffer.deactivate();
+}
+
+void Model::bindUniformBlock(const std::string &name, int slot) const {
+    shader.bindUniformBlock(name, slot);
+}
+
+// MARK: - Bulb
+
+void Bulb::updateTransform(const glm::mat4 &transform) {
+    Model::updateTransform(transform);
+    position = transform[3];
+}
